@@ -204,13 +204,17 @@ function resolveTool(name, candidates) {
 function resolveCliTools() {
   const git = resolveTool('git', GIT_DIR_CANDIDATES);
   const gh = resolveTool('gh', GH_DIR_CANDIDATES);
-  const pathDirs = [git && git.dir, gh && gh.dir].filter(Boolean);
+  // Optional: a bundled PowerShell 7. DSH prefers %ProgramFiles%\PowerShell\7, then
+  // PATH, then Windows PowerShell 5.1, so prepending this directory upgrades the shell.
+  const pwsh = resolveTool('pwsh', [portableTool('tools', 'powershell')]);
+  const pathDirs = [git && git.dir, gh && gh.dir, pwsh && pwsh.dir].filter(Boolean);
   const missing = [];
   if (!git) missing.push('git (Git for Windows)');
   if (!gh) missing.push('gh (GitHub CLI)');
-  const result = { git, gh, pathDirs, missing };
+  const result = { git, gh, pwsh, pathDirs, missing };
   log('[preflight] git: ' + (git ? git.dir + ' (' + git.via + ')' : 'MISSING'));
   log('[preflight] gh:  ' + (gh ? gh.dir + ' (' + gh.via + ')' : 'MISSING'));
+  log('[preflight] pwsh: ' + (pwsh ? pwsh.dir + ' (' + pwsh.via + ')' : 'none bundled, DSH falls back'));
   return result;
 }
 
