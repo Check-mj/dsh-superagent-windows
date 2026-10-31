@@ -69,10 +69,10 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
 
 | 组件 | 位置 / 取值 | 状态 |
 | --- | --- | --- |
-| 桌面应用（安装后） | 安装根目录 `%LOCALAPPDATA%\Programs\Superagent\`：`Superagent.exe`（Electron 44.7.0，自包含）+ `resources\app\` + `config\` + `data\`；启动必须带 `--no-sandbox --disable-gpu`（快捷方式已内置） | ✅ 构建/验收过；安装器见 3.6 |
-| 桌面快捷方式 | `%USERPROFILE%\Desktop\Superagent.lnk` + 开始菜单 `…\Programs\Superagent\Superagent.lnk`（由 `install.ps1` 用解析后的真实路径生成） | ✅ 由安装器创建 |
+| 桌面应用（安装后） | 安装根目录 `%LOCALAPPDATA%\Programs\Superagent\`：`Superagent.exe`（Electron 44.7.0，自包含）+ `resources\app\` + `config\paths.json` + `tools\`（自带 git/gh，可选）+ Electron 运行时；**装好约 500 MB**（其中 `tools\` ≈133 MB：git 93 + gh 40，`resources\` 237 KB）。启动必须带 `--no-sandbox --disable-gpu`（快捷方式已内置） | ✅ 安装器已实跑（`install.cmd -Force` 退出 0）并验收 |
+| 桌面快捷方式 | `%USERPROFILE%\Desktop\Superagent.lnk` + 开始菜单 `…\Programs\Superagent\Superagent.lnk`：Target=`<root>\Superagent.exe`、Arguments=`--no-sandbox --disable-gpu`、WorkingDirectory=`<root>`（`install.ps1` 用解析后的真实路径生成） | ✅ 已核对 |
 | 应用源码（在 checkout 里） | `<checkout>\windows-app\`：`Superagent\`（构建产物，368 MB）、`main.js`、`build-portable.js`、`install.ps1`、`install.cmd`、`README.md`、`INSTALL.md`、`verification\` | ✅ 已读源码 |
-| 应用用户数据 | 安装根目录下的 `data\`（`app.log`、`backend.log`、`window-state.json`、`runtime.patch.yml`；`SUPERAGENT_SCREENSHOT=1` 时另有 `screenshot.png`）<br>不可写时回退 `%APPDATA%\Superagent` | 🔧 按源码/INSTALL.md；旧构建验收日志见 12.1 |
+| 应用用户数据 | **默认 `%APPDATA%\Superagent\`**（`app.log`、`backend.log`、`window-state.json`、`runtime.patch.yml`；`SUPERAGENT_SCREENSHOT=1` 时另有 `screenshot.png`）<br>回退：`<exe 所在目录>\user-data\` → `%TEMP%\superagent-user-data` | 🔧 源码；实测 app.log 在此 |
 | DSH 安装 | `%APPDATA%\npm\node_modules\@deepseek-ai\dsh`（版本 `0.2.1-rc.3`） | ✅ |
 | DSH profile | `%USERPROFILE%\.dsh\profiles\superagent\` | ✅ 已存在 |
 | 插件 checkout | `<checkout>`（profile 以 `link:` 指向它） | ✅ 已 link |
@@ -86,7 +86,7 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
 
 | | **桌面应用**（日常用） | **CLI 服务管理器**（排障 / 无人值守） |
 | --- | --- | --- |
-| 入口 | 双击桌面快捷方式 `Superagent.lnk`（或兜底 `启动 Superagent.cmd`） | `.\scripts\dsh-superagent.cmd start` |
+| 入口 | 双击桌面快捷方式 `Superagent.lnk`（安装器创建；从源码目录直接跑用 `windows-app\启动 Superagent.cmd`） | `.\scripts\dsh-superagent.cmd start` |
 | 端口 | 随机空闲端口（应用写入 `runtime.patch.yml` 覆盖） | profile 里写死的 `3082` |
 | 需要打开浏览器吗 | 不需要，窗口内嵌面板 | 需要，日志里会打印带 token 的 URL |
 | 需要 `gh` 在 PATH 吗 | 不需要（面板里填绝对路径） | 同左 |
@@ -134,14 +134,15 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
   → 看到这条，**第一件事是在新开终端里跑 `where git`**，通常就是 git 不在 PATH 上。
 - `gh`：运行期只通过**面板里填的那个绝对路径**调用它（第 7.2 节），所以**严格来说 `gh` 不在 PATH 也能工作**；但建议一并加入 User PATH，方便你手动登录/自查，也让应用的探测能发现它。
 
-**桌面应用 / 安装器的工具探测（可重定位，见 INSTALL.md §3.2–3.3）**：按顺序找
-① 安装根目录自带的 `<安装根目录>\tools\git\cmd`、`tools\git\bin` / `tools\gh\bin`（自包含安装用）→
-② `where git` / `where gh`（PATH）→ ③ `%ProgramFiles%\Git\cmd`、`%ProgramFiles(x86)%\Git\cmd`、`%LOCALAPPDATA%\Programs\Git\cmd`、`%ProgramFiles%\GitHub CLI`、`%LOCALAPPDATA%\Programs\GitHub CLI`。
-找到就把目录**前置到后端子进程的 PATH**（不设置 `GH_CONFIG_DIR`，那个由插件管）；也可用 `SUPERAGENT_GIT_DIR` / `SUPERAGENT_GH_DIR` 直接指定。
+**桌面应用 / 安装器的工具探测（可重定位，见 INSTALL.md §3.2–3.3）**：**显式覆盖与安装自带的 `tools\` 都排在 PATH 之前**——自包含安装不会被机器上别处的副本顶掉。
+解析优先级：`SUPERAGENT_GIT_DIR` / `SUPERAGENT_GH_DIR` 与 `<root>\tools\git\cmd`、`tools\git\bin`、`tools\gh\bin` 先于 PATH → 再往后是 `where git`/`where gh`（PATH）→ 最后是 `%ProgramFiles%\Git\cmd`、`%ProgramFiles(x86)%\Git\cmd`、`%LOCALAPPDATA%\Programs\Git\cmd`、`%ProgramFiles%\GitHub CLI`、`%LOCALAPPDATA%\Programs\GitHub CLI`。
+**本机实测**：装好 `tools\` 后 preflight 走的是 `git: <root>\tools\git\cmd (bundled tools)`、`gh: <root>\tools\gh\bin (bundled tools)`。
+找到就把目录**前置到后端子进程的 PATH**（不设置 `GH_CONFIG_DIR`，那个由插件管）。
 找不到时**不致命**：启动页和面板顶部显示横幅
 `未找到 git (Git for Windows) / gh (GitHub CLI)：GitHub 集成不可用。请安装 Git for Windows 与 GitHub CLI，并加入用户 PATH，然后按 Ctrl+Shift+R 重启后端。`
 **看到横幅时，按 2.4 把它们加进 User PATH 再重启应用。**
 注意这条便利层只覆盖**桌面应用**启动的后端；用 `scripts\dsh-superagent.cmd` 启动的 CLI 路径**不会**自动注入，必须靠 User PATH。
+应用侧覆盖变量全集：`SUPERAGENT_GIT_DIR`、`SUPERAGENT_GH_DIR`、`SUPERAGENT_NODE`、`SUPERAGENT_DSH_BIN`、`SUPERAGENT_CWD`/`SUPERAGENT_CHECKOUT`、`SUPERAGENT_USER_DATA`、`SUPERAGENT_HOME`、`SUPERAGENT_PORT`、`SUPERAGENT_PROFILE`、`SUPERAGENT_STATE_DIR`。
 
 > 立刻自查：**新开**一个 PowerShell 窗口运行 `git --version` 与 `gh --version`。
 > 看不到版本号也不一定打不开桌面应用（应用会用已知目录兜底并显示横幅），但 **CLI 路径一定需要**；
@@ -316,12 +317,24 @@ set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
 & '<checkout>\windows-app\install.cmd' -Force
 ```
 
+✅ **本机已实跑验证**（`install.cmd -Force`，退出码 0）：
+
+- 安装根 `%LOCALAPPDATA%\Programs\Superagent` 存在，**合计约 500 MB**；
+- `tools\` ≈ **133 MB**（git 93 MB + gh 40 MB），`resources\` 237 KB，其余是 Electron 运行时；
+- `config\paths.json` 已写入（**无 BOM**）：`{"checkout": "<checkout>", "installRoot": "%LOCALAPPDATA%\\Programs\\Superagent", "installed": "<ISO 时间>"}`；
+- 桌面与开始菜单快捷方式已**重指**：Target=`<root>\Superagent.exe`、Arguments=`--no-sandbox --disable-gpu`、WorkingDirectory=`<root>`；
+- 启动后窗口标题 `Superagent`，日志出现 `[ready] backend URL: http://127.0.0.1:<port>/?token=…` 与 `[ui] document.title: DeepSeek Harness`；后端 `cwd` 通过 `paths.json` 解析到 `<checkout>`；
+- preflight 从安装自身解析工具：`git: <root>\tools\git\cmd (bundled tools)`、`gh: <root>\tools\gh\bin (bundled tools)`。
+
 安装器做的事（INSTALL.md §1/§2）：
 
 - 把 `windows-app\Superagent\*` 复制到安装根目录：`Superagent.exe` + `resources\app\` + Electron 运行时；
-- 创建 `config\`（可写、升级保留）与 `data\`（应用日志/状态，升级保留）；
-- 把 `<checkout>` 记录进 `config\paths.json`（**不复制**插件源码）；装好 `tools\`（可选，自包含 git/gh）时优先用它；
-- 创建桌面与开始菜单快捷方式：目标=安装根目录的 `Superagent.exe`，参数 `--no-sandbox --disable-gpu`，工作目录=安装根目录。
+- 创建 `config\`（可写、升级保留；`paths.json` 记录插件 checkout）；
+- 把 `<checkout>` 记录进 `config\paths.json`（**不复制**插件源码）；
+- 创建桌面与开始菜单快捷方式：目标=安装根目录的 `Superagent.exe`，参数 `--no-sandbox --disable-gpu`，工作目录=安装根目录；
+- `tools\` 是**可选**的自包含工具目录（安装器不复制；本机安装根里已放入 git/gh）。`-Force` 覆盖安装只复制应用，**不会删掉 `tools\`**。
+
+> ⚠️ `config\paths.json` 必须**无 BOM**。PowerShell 5.1 的 `Set-Content -Encoding UTF8` 会写 BOM，`JSON.parse` 会拒绝它——安装器已改成无 BOM 写入，读取端也会剥掉开头的 BOM 兜底。手工改这个文件时请用无 BOM 的 UTF-8。
 
 安装根目录优先级：`install.cmd -Root "<目录>"` → 环境变量 `SUPERAGENT_HOME` → 默认 `%LOCALAPPDATA%\Programs\Superagent`。
 
@@ -345,8 +358,11 @@ Test-Path "$env:USERPROFILE\.dsh\profiles\superagent\cordis.patch.yml"          
 Select-String -Path "$env:USERPROFILE\.dsh\profiles\superagent\package.json" -Pattern 'dsh-superagent'  # link: 存在
 Test-Path "$checkout\windows-app\Superagent\Superagent.exe"        # True（构建后）
 Test-Path "$root\Superagent.exe"                                   # True（安装后）
-Test-Path "$root\config\paths.json"                                # True（记录 checkout）
+Test-Path "$root\config\paths.json"                                # True（记录 checkout；无 BOM）
+Test-Path "$root\tools\git\cmd\git.exe"                            # True（若放了自包含 git）
+Test-Path "$root\tools\gh\bin\gh.exe"                              # True（若放了自包含 gh）
 Test-Path (Join-Path $env:USERPROFILE 'Desktop\Superagent.lnk')    # True（安装器创建的快捷方式）
+(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $env:USERPROFILE 'Desktop\Superagent.lnk')).TargetPath  # <root>\Superagent.exe
 Test-Path "$env:USERPROFILE\.dsh\.credentials.yaml"                # True（模型凭据）
 git --version                                                      # 2.32 以上，且后端进程能看到
 gh --version                                                       # 2.48 以上（或用应用横幅/SUPERAGENT_GH_DIR 指向 gh.exe）
@@ -524,14 +540,10 @@ gh api users/<agent-login> --jq '{login: .login, id: .id}'
 
 ### 6.3 准备 `gh` 可执行文件
 
-本机 `gh` **不在 PATH**，只有便携版：
-
-```
-C:\path\to\gh.exe        # v2.103.3，满足 >= 2.48
-```
+`gh` **不一定在 PATH 上**。装好 GitHub CLI 后，用 `where gh` 查到真实路径，这就是面板要填的值（示例：`C:\path\to\gh.exe`；官方按用户安装时通常是 `%LOCALAPPDATA%\Programs\GitHub CLI\gh.exe` 或 `%LOCALAPPDATA%\GitHubCLI\gh.exe`，以 `where gh` 为准）。
 
 - **运行期不依赖 PATH**：面板里填的是这个 `.exe` 的绝对路径（6.7），插件只按这个路径调用它。
-- **建议同时加入当前用户 PATH**（2.4）：方便你手动登录/自查，也让桌面应用的自动探测能找到它；长期使用建议装一份官方 GitHub CLI 到用户目录。
+- **建议同时加入当前用户 PATH**（2.4）：方便你手动登录/自查，也让桌面应用的自动探测能找到它（应用也可以用它自带的 `tools\gh\bin`，或用 `SUPERAGENT_GH_DIR` 指定）。
 
 ### 6.4 机制：用 `GH_CONFIG_DIR` 选择智能体账户
 
@@ -580,7 +592,7 @@ exit /b %ERRORLEVEL%
 | --- | --- |
 | `setlocal` | 不改动调用者窗口的环境 |
 | `set "GH_CONFIG_DIR=…"` | 指向插件给智能体准备的配置目录（token 存在该目录的 `hosts.yml`）。**必须与 `stateDir` 对应**；换 profile/stateDir 时这里也要改 |
-| `"…\gh.exe" %*` | 用**绝对路径**调用真正的 gh，参数原样传递。虽然插件不会调用这个包装器，但 worker 环境的 PATH 最前面有 `<stateDir>\worker-bin\gh.cmd` shim，按名字调 `gh` 仍可能转回自己 |
+| `"…\gh.exe" %*` | 用**绝对路径**调用真正的 gh。虽然插件不会调用这个包装器，但 PATH 上可能有插件的 `gh.cmd` 垫片（它用插件注入的 `GH_CONFIG_DIR`/账号去调真实 gh）；按名字调用会命中垫片而不是你包装器里的配置。绝对路径保证始终调到你指定的那个 `gh.exe` |
 | `exit /b %ERRORLEVEL%` | 原样传递退出码 |
 
 > gh 装在别处（winget/官方 MSI）时，只改调用 `gh.exe` 的那一行；路径带空格也没问题（引号已验证）。
@@ -762,6 +774,9 @@ C:\Users\<you>\bin\prepare-ticket.cmd
 - 失败时的 `exit /b` 退出码会正确传回，面板会显示 `The prepare command failed: …` 和输出。
 
 **为什么用包装器而不是一行命令**：cmd 里没有"空值取默认"，如果直接把 `%DSH_SUPERAGENT_GITHUB_PR_HEAD%` 拼进 refspec，PR head 为空时会变成 `:refs/...`，`git fetch` 直接报 invalid refspec。包装器里的 `if "%REF%"=="" set "REF=HEAD"` 解决这一点，并且把容易出错的引号集中在一处。
+
+> `GIT=git.exe` 依赖后端进程的 PATH 上有 git；若没有（或想锁定版本），把它改成 git 的绝对路径，例如 `set "GIT=%ProgramFiles%\Git\cmd\git.exe"`。
+> `%USERPROFILE%\src\widgets` 是 `.cmd` 里的展开，正确；面板里那个"准备命令"值必须是**字面绝对路径**（不能写 `%USERPROFILE%`）。
 
 ### 7.5 Prompts（提示词 / 团队段落）
 
@@ -1059,6 +1074,8 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | 应用错误页出现 `EPERM ... cordis.yml` / 无法写 `%USERPROFILE%\.dsh` | 应用运行在**受限（Low-integrity）令牌**下（例如从自动化/沙箱上下文启动），Electron 写不了你的用户目录。**正常从 Explorer 双击（Medium IL）预期没问题，但还没有被一次普通双击验证过**；排障时可用 `DSH_HOME` 指向可写目录 + `SUPERAGENT_STATE_DIR` 指向临时状态目录（验收时就是这么做的，**不要**用于正式数据） |
 | 直接双击 exe 后窗口一闪而过/崩溃 | 少了 `--no-sandbox --disable-gpu`。用安装器创建的桌面快捷方式，或源码目录的 `启动 Superagent.cmd`（两者都内置参数） |
 | 移动了安装目录/checkout 后打不开、或快捷方式失效 | 重跑 `<checkout>\windows-app\install.cmd -Force`：它会重写 `config\paths.json` 与两个快捷方式；不要手工改快捷方式 |
+| 后端 cwd 落在 `%USERPROFILE%\.dsh\profiles\superagent` 而不是 `<checkout>` | 旧版应用的 bug：安装记录被从 `APP_ROOT\..\config\paths.json` 读取（正确是 `<root>\config\paths.json`），于是静默回退到 profile 目录。更新应用并 `install.cmd -Force` 后重启；临时可用 `SUPERAGENT_CWD=<checkout>` 绕过 |
+| 安装记录不生效 / 改了 `config\paths.json` 没反应 | `paths.json` 若带 **BOM**，`JSON.parse` 会失败并（旧版）被静默忽略。安装器已改为无 BOM 写入、读取端剥 BOM；手工编辑请用**无 BOM 的 UTF-8**，改完重启应用 |
 | 启动页/面板顶部出现横幅"未找到 git (Git for Windows) / gh (GitHub CLI)" | 应用没找到 git/gh，GitHub 集成不可用。按 2.4 加进 User PATH，然后 **Ctrl+Shift+R** 重启后端 |
 | 应用错误页提示"另一个 Superagent 后端正在运行并占用同一 stateDir" | 先关掉别的实例；或设 `SUPERAGENT_STATE_DIR` 指向独立状态目录再启动（排障用，不要用于正式数据） |
 | 应用错误页提示"端口被占用 … 若你设置了 SUPERAGENT_PORT" | 把 `SUPERAGENT_PORT` 改回 `0`（应用应使用系统分配端口） |
@@ -1085,22 +1102,25 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 
 ## 11. Windows 移植与上游的差异
 
+> 这是**操作者视角**的摘要。完整的逐处清单、冲突处理预案与升级判定标准以 `<checkout>\WINDOWS-DELTA.md` 为准；应用安装布局与路径解析顺序以 `<checkout>\windows-app\INSTALL.md` 为准。两份文档与本节冲突时，以它们为准。
+
 | # | 上游（POSIX） | Windows 移植后的行为 | 状态 |
 | --- | --- | --- | --- |
 | 1 | `scripts/dsh-superagent start` 用 **tmux** 会话，`stop` 发 SIGINT | 入口 **`scripts\dsh-superagent.cmd`**（批处理，不是 `.ps1`）；Windows 用 `CREATE_NO_WINDOW` 分离启动、`service.pid` 记录、**命名管道 → SIGINT 钩子**（`scripts\dsh-service-hook.mjs`，`node --import` 预加载）优雅停止；不注册服务、不强杀；退出码 0/1/2/3 不变 | ✅ 负责人端到端实测（含真实 dsh 退出码 130） |
-| 2 | 命令 shim 是 `#!/bin/sh` 无扩展名脚本 | 写成 **`<name>.cmd`**（`gh.cmd`、`lark-cli.cmd`、被禁命令 `<name>.cmd`），第二行用 `@REM Written by dsh-superagent…` 做归属标记 | 🔧 源码确认 |
+| 2 | 命令 shim 是 `#!/bin/sh` 无扩展名脚本 | 写成 **`<name>.cmd`**（`gh.cmd`、`lark-cli.cmd`、被禁命令 `<name>.cmd`）：`@echo off` + `@REM` 标记 + **绝对路径调用真实 CLI** + `%*` + `exit /b`；**不做 PATH 剥离**（绝对路径调用，无递归） | 🔧 源码确认 |
 | 3 | 准备命令 `sh -c <command>` | 改为 **`cmd.exe /d /s /c <command>`**；准备命令必须用 cmd 语法（`%VAR%`、`&&`），`sh.exe` **不需要** | 🔧 源码确认；✅ 用等价 `.cmd` 包装器实测通过 |
 | 4 | 账号探测用 `env PATH=… <cli>` | Windows 没有 `env`，改为给子进程显式传 PATH 覆盖，并**显式传 `GH_CONFIG_DIR`**（修复了"账号检查早于环境注入"的顺序问题） | 🔧 源码确认 |
 | 5 | 智能体 CLI 用 `~/.local/bin/gh-agent` sh 包装器换账号 | **`.cmd` 包装器不能当 CLI**：Node 在 Windows 上 spawn `.cmd` 直接 `EINVAL`（CVE-27980 加固），裸名字也不解析到 `.cmd`。改为：面板 CLI = **`gh.exe` 绝对路径**，账号隔离由插件注入的 `GH_CONFIG_DIR=<stateDir>\gh-config` 完成；`gh-agent.cmd` 降级为**登录/自查的便利包装器** | ✅ 负责人已验证 `EINVAL`；🔧 源码确认注入 |
 | 6 | `stateDir` 必须是 `/` 开头的 POSIX 绝对路径 | 接受 `C:/…` 或 `D:\…`（正则放宽为 `^(?:[A-Za-z]:[\\/]|\/)`） | ✅ 修复后实测插件可激活 |
-| 7 | 用 `ps`/`fcntl`/`SIGINT`/`umask`/`chmod` | 分别换成：`OpenProcess`/`msvcrt` 字节锁/`GenerateConsoleCtrlEvent`/无 | 🔧 源码确认 |
+| 7 | 用 `ps`/`fcntl`/`SIGINT`/`umask`/`chmod` | 分别换成：`OpenProcess`/`msvcrt` 字节锁/命名管道触发的 SIGINT 钩子/无 | 🔧 源码确认 |
 | 8 | `--port` 可改面板端口 | **profile 的 `webserver.port` 会覆盖 CLI 的应用参数**；要改端口必须改 patch 文件或加 `--patch` overlay（桌面应用就是这么做的）；且 **`--patch` 必须放在应用参数之前** | ✅ 实测（`--port 0` 仍撞 3082；`--no-open --patch` 报 unknown option） |
-| 9 | 面板在浏览器里 | 桌面应用窗口内嵌同一套 Web 面板（无地址栏/标签页），侧栏 **Superagent** 不变 | 🔧 源码确认；⏳ 打包后待验收 |
+| 9 | 面板在浏览器里 | 桌面应用窗口内嵌同一套 Web 面板（无地址栏/标签页），侧栏 **Superagent** 不变 | ✅ 已用截图验证渲染；安装器布局待验收 |
 | 10 | `dsh` 是 POSIX 可执行 | Windows 上 npm 生成 `dsh.cmd`；脚本/文档一律用 `.cmd`，并注意 `Restricted` 执行策略 | ✅ |
 | 11 | 每小时巡检跑 `scripts/dsh-superagent …` | Windows 用 `scripts\dsh-superagent.cmd …`（8.6） | 🔧 |
 | 12 | 数据库、锁、SQLite、`proper-lockfile`、`--no-open`、`DSH_HOME` | 行为不变；但 Windows 上**一个 `stateDir` 只能有一个后端**（`Lock file is already being held`），要把它当作正常的单实例保护 | ✅ 实测 |
 | 13 | 飞书 Source | 本机不启用（`dsh-superagent-feishu` 保持 disabled）；如启用需另配 `lark-cli.cmd` | — |
-| 14 | 应用从 Explorer 继承环境 | 应用启动时探测 git/gh（`where` + 已知目录）并前置到后端子进程 PATH；找不到就在启动页与面板顶部显示横幅告知。CLI 路径不做注入，靠 User PATH | 🔧 源码确认（GUI 未验收） |
+| 14 | 无桌面应用（只有浏览器面板） | 新增 **`windows-app\` Electron 壳 + `install.ps1` 安装器**：构建产物 368 MB、装好 ≈500 MB（含自带 git+gh ≈133 MB）、可整体搬家、无管理员、注册表零残留；布局是 `<root>\Superagent.exe` + `resources\app\` + `config\paths.json` + `tools\`（可选）+ Electron 运行时，插件 checkout 由 `paths.json` 记录（不复制） | ✅ 安装器实跑 + 启动/渲染验收 |
+| 15 | 工具来自 PATH | 安装器壳按「显式覆盖 / 自带 `tools\` → PATH → 标准安装位置」探测 git/gh 并前置到后端子进程 PATH；自带 tools 优先于 PATH（自包含安装不被机器上别处副本顶掉）；缺失只警告不致命；覆盖变量 `SUPERAGENT_GIT_DIR` / `SUPERAGENT_GH_DIR` | ✅ 实跑：preflight 显示 `bundled tools` |
 
 ---
 
@@ -1114,7 +1134,7 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | --- | --- |
 | 启动器 `scripts\dsh-superagent.cmd` 的 `start/status/stop/restart` 与四个退出码 | 移植负责人端到端跑过：`start` 起真实 dsh（带 `--import` hook、`--patch` overlay 换端口）→ API 应答 → `stop` 发 SIGINT → 进程以 **130** 退出；0/1/2/3 四种码都实际触发过 |
 | 优雅停止无强杀 | `stop` 约 0.7 秒返回，pidfile 删除；超时会报错而不是 `taskkill` |
-| 命令 shim 的 Windows 形式 | `worker-bin\<name>.cmd`、PATH 剥离、`%*` 传参、退出码透传、被禁命令 stderr + exit 1，全部验证 |
+| 命令 shim 的 Windows 形式 | `worker-bin\<name>.cmd`：`@echo off` + `@REM` 标记 + **绝对路径调用真实 CLI** + `%*` + `exit /b`；Windows 上**不做 PATH 剥离**（绝对路径调用，无递归）；被禁命令 stderr + exit 1 |
 | git 凭据助手 | `helper = !'<gh.exe 绝对路径>' auth git-credential` 经 Git for Windows 的 `sh` 执行；`GH_CONFIG_DIR` 在环境里时 `git credential fill` 返回智能体账号，不在时失败 |
 | `verifyEnvironment` 的逐字节比较在 Windows 上原样通过（实测） | `git config -z --show-origin --get-all credential.https://github.com.helper` 的真实输出是 `['file:C:\\…\\worker-gitconfig', "!'C:/…/gh.exe' auth git-credential", '']`，与期望的 `['file:' + workerGitConfig, credentialHelper(cli), '']` 完全一致 → **不会误报 `gitTooOld`**。前提：git 必须是自带 `sh.exe` 的发行版（Git for Windows / MinGit）。注意 `-z`：不带 `-z` 时 git 会 C-quote 路径（`file:"C:\\…"`），手工诊断看起来像不匹配 |
 | `.cmd` 不能被无 shell 地 spawn | Node ≥18.20/20.12 起（CVE-2024-27980）抛 `EINVAL`；所以面板 CLI 必须是 `.exe` |
@@ -1122,19 +1142,23 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | 端口/`--patch` 规则 | `--port` 输给 profile 的 `webserver.port`；`--patch` 是启动器参数，必须排在应用参数之前；`--no-open --patch` 报 `unknown option` |
 | stateDir 单实例 | 同一 `stateDir` 第二个后端 `Lock file is already being held` |
 | 面板后端行为 | `dsh web: http://127.0.0.1:<port>/?token=…` 打印；裸 URL 401；`GET /orchestrator/api/state` 200，待配置状态为 `setup.problem.code = repositoryUnset` + `health.runtime = paused/setupPending` |
-| 桌面应用启动与面板渲染（应用负责人验收，`superagent-app\README.md` §8） | 快捷方式参数启动后窗口标题 `Superagent`；约 5 秒抓到 backend URL；`did-finish-load http://127.0.0.1:<port>/`、`document.title = DeepSeek Harness`；截图 `<checkout>\windows-app\verification\panel-rendered.png` 显示 Superagent 概览/来源/触发/评估/执行/设置 面板（`repositoryUnset` 是插件的正常待配置状态） |
+| **安装器流程（实跑，退出码 0）** | `install.cmd -Force` 经文档入口执行成功：打印 install root/checkout、复制应用、记录 `config\paths.json`、创建两个快捷方式。安装根 `%LOCALAPPDATA%\Programs\Superagent` 存在，**约 500 MB**（`tools\` ≈133 MB：git 93 + gh 40；`resources\` 237 KB；其余 Electron）。`paths.json` 写入**无 BOM**，内容为 `{"checkout": "<checkout>", "installRoot": "...", "installed": "<ISO>"}` |
+| 快捷方式 | 桌面与开始菜单快捷方式均正确：Target=`<root>\Superagent.exe`、Arguments=`--no-sandbox --disable-gpu`、WorkingDirectory=`<root>`（旧的失效路径问题已不存在） |
+| 安装后启动与面板渲染（实跑） | 窗口标题 `Superagent`；`[ready] backend URL: http://127.0.0.1:<port>/?token=…`；`[ui] document.title: DeepSeek Harness`（面板加载）；后端 `cwd` 经 `paths.json` 解析到 `<checkout>`；截图见 `<checkout>\windows-app\verification\` |
+| git/gh preflight（实跑） | 从**安装自身**解析：`git: <root>\tools\git\cmd (bundled tools)`、`gh: <root>\tools\gh\bin (bundled tools)`；自带 `tools\` 优先于 PATH，显式覆盖变量见 2.2 |
+| 构建产物 vs 安装产物 | `windows-app\Superagent\` = 368 MB（Electron 44.7.0，构建产物）；装好后 ≈500 MB（多出自带 `tools\`） |
 | token URL 语义 | token URL → 303 → 写 cookie → 200；裸 root → 401（设计如此） |
 | 应用单实例 | 第二次启动只聚焦已有窗口，不启动第二个后端 |
 | 优雅退出 | `SIGTERM` → backend exited，应用约 1 秒退出；事后 **0 个 Superagent + 0 个 dsh node 进程** |
 | 窗口状态 | 关闭时写 `window-state.json`（如 `{"x":640,"y":266,"width":1280,"height":860,"maximized":false}`） |
-| git/gh preflight | 实测解析到 `git: %ProgramFiles%\Git\cmd`、`gh: %ProgramFiles%\GitHub CLI`（Explorer PATH 里都没有，靠已知目录兜底） |
-| 便携应用 | `Superagent\` = 368 MB，Electron 44.7.0，自包含；`--no-sandbox --disable-gpu` 为必需参数 |
+| 已修复的两个应用 bug（验证时发现） | ① 安装记录路径曾读成 `APP_ROOT\..\config\paths.json`（正确是 `APP_ROOT\config\paths.json`），导致后端 cwd 静默回退到 profile 目录；② PowerShell 5.1 `Set-Content -Encoding UTF8` 写 BOM，`JSON.parse` 拒绝 → 记录被静默忽略。两侧都已修（安装器写无 BOM、读取端剥 BOM） |
 
 ### 12.2 还没验证的（写了做法，但没人跑完）
 
 | 项 | 说明 |
 | --- | --- |
-| 正常桌面用户双击的真实路径 | 应用负责人的验收是在**自动化/受限令牌**下做的（Electron 拿到 Low-integrity 令牌写不了 `%USERPROFILE%\.dsh`，所以当时用了 `DSH_HOME=<临时目录>\dsh-home` + `SUPERAGENT_STATE_DIR=<临时目录>\app-test-state`）。**正常用户从自己桌面双击**预期不受此限制，但这一步没人跑过；首次使用请以"能否打开面板且 Overview 不报 EPERM"为准 |
+| 正常桌面用户双击的真实路径 | 应用验收是在**自动化/受限令牌**下做的（Electron 拿到 Low-integrity 令牌写不了 `%USERPROFILE%\.dsh`，所以当时用了 `DSH_HOME=<临时目录>\dsh-home` + `SUPERAGENT_STATE_DIR=<临时目录>\app-test-state`）。**正常用户从自己桌面双击（Medium IL）**预期不受此限制，但这一步没人跑过；首次使用请以"能否打开面板且 Overview 不报 EPERM"为准 |
+| 安装后整体搬家 | 设计上支持（重跑 `install.cmd -Force` 重写 `paths.json`/快捷方式），但没有实跑过 |
 | 端到端首单 | "智能体账户登录 + 面板填仓库/CLI → 允许列表 @ 一下 → 1 分钟内出 Ticket → PR"整链尚未完整实测 |
 | winget id 与 `--scope user` | 当前无网络/不能提权，未验证；以官方安装器的"当前用户"选项为准 |
 | 面板设置页交互 | 面板**渲染**已验证（截图）；Sources/Policy/Execution/Prompts 的逐项点击与保存流程未在应用窗口里逐项走过（字段与语义依据源码/上游文档） |
@@ -1156,13 +1180,15 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 
 | 名称 | 路径 |
 | --- | --- |
-| 本 checkout | `<checkout>` |
-| 桌面应用 | `<checkout>\windows-app\Superagent\Superagent.exe`（便携目录 368 MB，Electron 44.7.0） |
-| 桌面快捷方式 | `%USERPROFILE%\Desktop\Superagent.lnk`；开始菜单 `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Superagent\Superagent.lnk` |
-| 兜底启动器 | `<checkout>\windows-app\启动 Superagent.cmd` |
-| 应用源码 / 说明 | `<checkout>\windows-app`（以其 `README.md` 为准；验收证据在 `verification\`） |
-| 应用用户数据（正常） | `%USERPROFILE%\AppData\Roaming\Superagent\`（`app.log`、`backend.log`、`window-state.json`、`runtime.patch.yml`） |
-| 应用用户数据（受限令牌兜底） | `<Superagent.exe 所在目录>\user-data\`，再兜底 `%TEMP%\superagent-user-data` |
+| 本 checkout（源码 / 插件） | `<checkout>`（相对上游：git fork，见 `WINDOWS-DELTA.md`） |
+| 桌面应用源码 | `<checkout>\windows-app\`（`main.js`、`build-portable.js`、`install.ps1`、`install.cmd`、`README.md`、`INSTALL.md`、`Superagent\` 构建产物、`verification\`） |
+| 安装根目录（默认） | `%LOCALAPPDATA%\Programs\Superagent`（`install.cmd -Root` 或 `SUPERAGENT_HOME` 可改；装好 ≈500 MB） |
+| 已安装的 exe | `<安装根目录>\Superagent.exe` |
+| 自包含工具（可选） | `<安装根目录>\tools\git\cmd`、`tools\gh\bin`（本机已放，≈133 MB；优先于 PATH） |
+| 安装记录 | `<安装根目录>\config\paths.json`（记录 `<checkout>`；**无 BOM**；不复制插件源码） |
+| 桌面 / 开始菜单快捷方式 | `%USERPROFILE%\Desktop\Superagent.lnk`；`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Superagent\Superagent.lnk` |
+| 应用用户数据（默认） | `%APPDATA%\Superagent\`（`app.log`、`backend.log`、`window-state.json`、`runtime.patch.yml`） |
+| 应用用户数据（回退） | `<exe 所在目录>\user-data\` → `%TEMP%\superagent-user-data` |
 | DSH home | `%USERPROFILE%\.dsh` |
 | profile | `%USERPROFILE%\.dsh\profiles\superagent` |
 | 机器配置 | `%USERPROFILE%\.dsh\profiles\superagent\cordis.patch.yml` |
@@ -1173,17 +1199,16 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | CLI 日志/控制 | `<checkout>\.artifacts\` |
 | DSH 启动诊断 | `%USERPROFILE%\.dsh\logs\startup-*.log` |
 | 智能体 gh 配置 | `%USERPROFILE%\.dsh\state\superagent\gh-config`（由插件通过 `GH_CONFIG_DIR` 使用；`gh-agent.cmd` 只是登录入口） |
-| 便携工具链 | `<便携工具链>`（`env.ps1`、`git`、`gh`、`python`） |
 | 本地 clone（worktree 基座） | `%USERPROFILE%\src\widgets`（按实际仓库名） |
 
 ### 13.2 命令速查
 
 ```powershell
-# --- 打开环境（可选，本机便携工具链）---
-. <便携工具链>\env.ps1
+$checkout = 'C:\src\dsh-superagent'                  # ← 换成你的 <checkout>
+$root     = "$env:LOCALAPPDATA\Programs\Superagent"  # ← 或 -Root 指定的安装根目录
 
 # --- 构建/更新插件 ---
-Set-Location <checkout>
+Set-Location $checkout
 & (Get-Command pnpm.cmd).Source install
 & (Get-Command pnpm.cmd).Source build
 
@@ -1191,17 +1216,17 @@ Set-Location <checkout>
 & 'C:\Program Files\nodejs\npm.cmd' install -g '@deepseek-ai/dsh@0.2.1-rc.3'
 & "$env:APPDATA\npm\dsh.cmd" --version
 
-# --- link 插件（已做过就不要再做）---
-& "$env:APPDATA\npm\dsh.cmd" plugin --profile superagent add "link:D:/1111/dsh-superagent"
+# --- link 插件（已做过就不要再做；路径用正斜杠）---
+& "$env:APPDATA\npm\dsh.cmd" plugin --profile superagent add "link:D:/src/dsh-superagent"
 
 # --- 智能体账户 ---
 & "$env:USERPROFILE\bin\gh-agent.cmd" auth login --hostname github.com --git-protocol https --web
 & "$env:USERPROFILE\bin\gh-agent.cmd" api user --jq .login
 
 # --- 启停（CLI 路径）---
-.\scripts\dsh-superagent.cmd start
-.\scripts\dsh-superagent.cmd status
-.\scripts\dsh-superagent.cmd stop
+& "$checkout\scripts\dsh-superagent.cmd" start
+& "$checkout\scripts\dsh-superagent.cmd" status
+& "$checkout\scripts\dsh-superagent.cmd" stop
 
 # --- 管理 API ---
 $h = @{ 'x-orchestrator-request' = '1' }
@@ -1210,52 +1235,73 @@ Invoke-RestMethod 'http://127.0.0.1:3082/orchestrator/api/state' -Headers $h
 # --- 端口占用 ---
 Get-NetTCPConnection -LocalPort 3082 -ErrorAction SilentlyContinue | Select-Object LocalAddress,State,OwningProcess
 
-# --- 应用构建/更新（先关掉应用，避免目录被锁）---
-cd /d <checkout>\windows-app
-set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
-"C:\Program Files\nodejs\npm.cmd" install --no-audit --no-fund
-"C:\Program Files\nodejs\node.exe" build-portable.js
+# --- 应用：构建 → 安装/修复（先关掉应用，避免目录被锁）---
+Set-Location "$checkout\windows-app"
+$env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
+& 'C:\Program Files\nodejs\npm.cmd' install --allow-scripts=electron
+& 'C:\Program Files\nodejs\node.exe' build-portable.js
+& "$checkout\windows-app\install.cmd" -Force
 ```
 
 ### 13.3 升级
 
+> checkout 现在是 **git fork**：`upstream` = 官方仓库，我们的改动是 `main` 上的提交，`upstream-base` tag 记录 fork 基线。完整流程与冲突预案见 `<checkout>\WINDOWS-DELTA.md` §5，这里是操作摘要。
+
 1. 等到没有执行器正在干活（面板 Execution 里没有 working 的工单）。
 2. 备份数据库：复制 `<stateDir>\orchestrator.sqlite` 到安全位置。
 3. 更新 checkout 并重建：
-   - 本 checkout 是**上游 zip 副本，没有 `.git`**；升级=用新版覆盖文件，再：
-     ```powershell
-     Set-Location <checkout>
-     & (Get-Command pnpm.cmd).Source install
-     & (Get-Command pnpm.cmd).Source build
-     ```
-   - ⚠️ 覆盖时不要动 profile 的 `cordis.patch.yml`，也不要动 `stateDir`。
-4. 重启后端（应用 Ctrl+Shift+R，或 CLI `restart`），再看 `status`。
-5. 如果有段落在面板显示 **Default updated**，逐段决定保留还是用新默认。
+
+   ```powershell
+   Set-Location $checkout
+   git fetch upstream
+   git log --oneline upstream-base..upstream/main      # 先看官方改了什么
+   git merge upstream/main
+   & (Get-Command pnpm.cmd).Source install
+   & (Get-Command pnpm.cmd).Source build
+   & (Get-Command pnpm.cmd).Source typecheck
+   & (Get-Command pnpm.cmd).Source vitest run tests/windows-port.spec.ts
+   ```
+
+   - `tests/windows-port.spec.ts` 是我们的**契约测试**（垫片形式、`GH_CONFIG_DIR`、`written()` 识别等），必须全绿；其余 POSIX-only 测试在 Windows 上失败属预期（见 `WINDOWS-DELTA.md` §4）。
+   - 升级后**重新生成 `worker-bin`**：删掉 `<stateDir>\worker-bin` 下的旧垫片，或让 setup 重跑（标记格式变了会触发 `foreignFile`）。
+   - ⚠️ 不要动 profile 的 `cordis.patch.yml`，也不要动 `stateDir` 里的数据。
+4. 应用壳有改动时重新打包并重装：`build-portable.js` → `install.cmd -Force`（见 3.6）。
+5. 重启后端（应用 Ctrl+Shift+R，或 CLI `restart`），再看 `status`。
+6. 如果有段落在面板显示 **Default updated**，逐段决定保留还是用新默认。
 
 > 降级注意：被新版本迁移过的数据库，旧版本打不开；回滚必须先恢复第 2 步的备份。
 
 ### 13.4 卸载 / 回滚
 
 ```powershell
-# 从 profile 里移除插件（不会删 checkout）
+# 1) 停止后端
+& "$checkout\scripts\dsh-superagent.cmd" stop
+
+# 2) 从 profile 里移除插件（不会删 checkout）
 & "$env:APPDATA\npm\dsh.cmd" plugin --profile superagent remove dsh-superagent
 
-# 停止 CLI 路径的服务
-.\scripts\dsh-superagent.cmd stop
+# 3) 删除应用（安装器布局：删目录即卸载，注册表无条目）
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\Superagent"
+Remove-Item -Force "$env:USERPROFILE\Desktop\Superagent.lnk"
+Remove-Item -Recurse -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Superagent"
 
-# 彻底清理（确认不再需要后）：profile、stateDir、应用、checkout
-#   %USERPROFILE%\.dsh\profiles\superagent
-#   %USERPROFILE%\.dsh\state\superagent
-#   <checkout>\windows-app\Superagent
-#   %USERPROFILE%\bin\gh-agent.cmd / prepare-ticket.cmd
-#   %USERPROFILE%\.dsh\state\superagent\gh-config（智能体账号的 gh 登录）
+# 4) 可选：删数据/账号配置（确认不再需要再删）
+#   %APPDATA%\Superagent                     ← 应用日志/窗口状态
+#   %USERPROFILE%\.dsh\profiles\superagent   ← profile（含 cordis.patch.yml）
+#   %USERPROFILE%\.dsh\state\superagent      ← stateDir：数据库、垫片、工单目录
+#   %USERPROFILE%\.dsh\state\superagent\gh-config ← 智能体账号的 gh 登录
+#   %USERPROFILE%\bin\gh-agent.cmd、prepare-ticket.cmd
 ```
 
+- 安装根目录若用 `-Root` 或 `SUPERAGENT_HOME` 改过，删那个目录。
 - `plugin remove` 的具体子命令名以 `dsh plugin --help` 为准（本手册未在 Windows 上实测该步）。
 - 卸载前先 `stop`，并确认没有 node 进程还在使用 `stateDir`。
+- 回滚代码：`git checkout <旧提交>` 后按 13.3 重建 + 重装；数据库需用升级前的备份。
 
 ### 13.5 参考
 
+- 本 fork 的**权威差量清单与升级流程**：`<checkout>\WINDOWS-DELTA.md`
+- **应用布局与路径解析顺序**：`<checkout>\windows-app\INSTALL.md`；应用本身：`<checkout>\windows-app\README.md`
 - 上游：`README.md`、`SETUP.md`、`docs/000`–`docs/008`（本 checkout 内）
 - 部署与排障原文：`docs/006-deployment.md`
 - 每条配置的**预期行为**以源码为准：`src/deployment.ts`、`src/infra/environment.ts`、`src/executor/dsh.ts`、`src/app/setup.ts`
@@ -1263,4 +1309,5 @@ set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
 
 ---
 
-> 本文件由 Windows 移植过程维护。移植改动集中在：`src/deployment.ts`（`stateDir` 校验、账号探测的 PATH/`GH_CONFIG_DIR` 注入）、`src/infra/environment.ts`（`.cmd` 命令 shim、`GH_CONFIG_DIR=<stateDir>\gh-config`、git 配置）、`src/app/setup.ts`（Windows 环境应用）、`scripts/dsh-superagent`（Windows 进程管理分支），以及新增的 `scripts/dsh-superagent.cmd`、`scripts/dsh-service-hook.mjs`；桌面应用在 `<checkout>\windows-app`。其余行为与上游一致；第 11 节是完整差异表，第 12 节是验证状态。
+> 本文件由 Windows 移植过程维护。仓库是对上游的 **git fork**：移植改动集中在 `src/deployment.ts`（`stateDir` 校验、账号探测的 PATH/`GH_CONFIG_DIR` 注入）、`src/infra/environment.ts`（`.cmd` 命令 shim、`GH_CONFIG_DIR=<stateDir>\gh-config`、git 配置）、`src/app/setup.ts`（Windows 环境应用）、`scripts/dsh-superagent`（Windows 进程管理分支），以及新增的 `scripts/dsh-superagent.cmd`、`scripts/dsh-service-hook.mjs`、`windows-app\`（Electron 壳 + 安装器）、`tests/windows-port.spec.ts`。其余行为与上游一致。
+> 权威文档：差量清单与升级流程 `<checkout>\WINDOWS-DELTA.md`；应用布局与路径解析 `<checkout>\windows-app\INSTALL.md`；本文件是操作手册，第 11 节是摘要、第 12 节是验证状态。
