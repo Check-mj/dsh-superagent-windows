@@ -35,7 +35,7 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ Superagent 桌面应用（Electron，便携，无 admin）              │
-│  D:\1111\superagent-app\Superagent\Superagent.exe           │
+│  %LOCALAPPDATA%\Programs\Superagent\Superagent.exe          │
 │  · 自己的窗口 + 图标，双击即用                               │
 │  · 负责拉起后端、清理子进程、显示启动失败页                  │
 └───────────────────────────┬──────────────────────────────────┘
@@ -60,9 +60,10 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
 
 | 组件 | 位置 / 取值 | 状态 |
 | --- | --- | --- |
-| 桌面应用（构建产物） | `D:\1111\superagent-app\Superagent\Superagent.exe`（便携目录约 250 MB） | ✅ 已构建；⏳ 双击验收中 |
-| 应用源码 | `D:\1111\superagent-app\`（`main.js`、`build-portable.js`、`icon.png`） | 🔧 已读源码 |
-| 应用用户数据 | `%APPDATA%\Superagent\`（`app.log`、`backend.log`、`runtime.patch.yml`、`window-state.json`）<br>实际路径以应用内 **帮助 → 关于 Superagent** 为准 | 🔧 源码确认，⏳ 目录名待实测 |
+| 桌面应用（安装后） | 安装根目录 `%LOCALAPPDATA%\Programs\Superagent\`：`Superagent.exe`（Electron 44.7.0，自包含）+ `resources\app\` + `config\` + `data\`；启动必须带 `--no-sandbox --disable-gpu`（快捷方式已内置） | ✅ 构建/验收过；安装器见 3.6 |
+| 桌面快捷方式 | `%USERPROFILE%\Desktop\Superagent.lnk` + 开始菜单 `…\Programs\Superagent\Superagent.lnk`（由 `install.ps1` 用解析后的真实路径生成） | ✅ 由安装器创建 |
+| 应用源码（在 checkout 里） | `<checkout>\windows-app\`：`Superagent\`（构建产物，368 MB）、`main.js`、`build-portable.js`、`install.ps1`、`install.cmd`、`README.md`、`INSTALL.md`、`verification\` | ✅ 已读源码 |
+| 应用用户数据 | 安装根目录下的 `data\`（`app.log`、`backend.log`、`window-state.json`、`runtime.patch.yml`；`SUPERAGENT_SCREENSHOT=1` 时另有 `screenshot.png`）<br>不可写时回退 `%APPDATA%\Superagent` | 🔧 按源码/INSTALL.md；旧构建验收日志见 12.1 |
 | DSH 安装 | `C:\Users\Chen\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh`（版本 `0.2.1-rc.3`） | ✅ |
 | DSH profile | `C:\Users\Chen\.dsh\profiles\superagent\` | ✅ 已存在 |
 | 插件 checkout | `D:\1111\dsh-superagent`（profile 以 `link:` 指向它） | ✅ 已 link |
@@ -76,7 +77,7 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
 
 | | **桌面应用**（日常用） | **CLI 服务管理器**（排障 / 无人值守） |
 | --- | --- | --- |
-| 入口 | 双击 `Superagent.exe` | `.\scripts\dsh-superagent.cmd start` |
+| 入口 | 双击桌面快捷方式 `Superagent.lnk`（或兜底 `启动 Superagent.cmd`） | `.\scripts\dsh-superagent.cmd start` |
 | 端口 | 随机空闲端口（应用写入 `runtime.patch.yml` 覆盖） | profile 里写死的 `3082` |
 | 需要打开浏览器吗 | 不需要，窗口内嵌面板 | 需要，日志里会打印带 token 的 URL |
 | 需要 `gh` 在 PATH 吗 | 不需要（面板里填绝对路径） | 同左 |
@@ -124,10 +125,11 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
   → 看到这条，**第一件事是在新开终端里跑 `where git`**，通常就是 git 不在 PATH 上。
 - `gh`：运行期只通过**面板里填的那个绝对路径**调用它（第 7.2 节），所以**严格来说 `gh` 不在 PATH 也能工作**；但建议一并加入 User PATH，方便你手动登录/自查，也让应用的探测能发现它。
 
-**桌面应用的便利层（已实现，🔧 源码确认；GUI 验收见 12.2）**：应用启动时会调 `where git` / `where gh`，找不到再试已知目录
+**桌面应用的便利层（已实现并验证，见 12.1）**：应用启动时会调 `where git` / `where gh`，找不到再试已知目录
 （git：`C:\Program Files\Git\cmd`、`C:\Program Files (x86)\Git\cmd`、`%LOCALAPPDATA%\Programs\Git\cmd`、`D:\1111\toolchain\git\cmd`；
 gh：`C:\Program Files\GitHub CLI`、`%LOCALAPPDATA%\GitHubCLI`、`D:\1111\toolchain\gh\bin`），
 找到就把它们的目录**前置到后端子进程的 PATH**（不设置 `GH_CONFIG_DIR`，那个由插件管）。
+本机实测 preflight 找到的正是 `git: D:\1111\toolchain\git\cmd` 与 `gh: D:\1111\toolchain\gh\bin`。
 两者都找不到时，启动页和面板顶部会显示横幅：
 `未找到 git (Git for Windows) / gh (GitHub CLI)：GitHub 集成不可用。请安装 Git for Windows 与 GitHub CLI，并加入用户 PATH，然后按 Ctrl+Shift+R 重启后端。`
 **看到横幅时，按 2.4 把它们加进 User PATH 再重启应用。**
@@ -292,30 +294,39 @@ Test-Path .\lib        # True
   ```
 - 以后升级插件：`git pull`（本 checkout 是 zip 副本，没有 `.git`，见 13.3）→ `pnpm install && pnpm build` → 重启（第 8 节）。
 
-### 3.6 构建桌面应用（✅ 已构建）
+### 3.6 构建 / 更新桌面应用（✅ 已构建并验收）
 
-应用源码：`D:\1111\superagent-app\`；构建脚本 `build-portable.js` 的步骤（已读源码）：复制 `node_modules\electron\dist\*` → `Superagent\`，把 `package.json`/`main.js`/`icon.png` 复制到 `Superagent\resources\app\`，删掉 `default_app.asar`，把 `electron.exe` 改名为 `Superagent.exe`。
+应用源码与说明：`D:\1111\superagent-app\`（以其中的 `README.md` 为准）。便携目录 `Superagent\` = **368 MB**，内含 Electron **44.7.0** 全套运行时；`Superagent.exe` 246 MB。
+构建脚本 `build-portable.js` 的步骤（已读源码）：复制 `node_modules\electron\dist\*` → `Superagent\`，把 `package.json`/`main.js`/`icon.png` 复制到 `Superagent\resources\app\`，删掉 `default_app.asar`，把 `electron.exe` 改名为 `Superagent.exe`。
 
-```powershell
-Set-Location D:\1111\superagent-app
-& 'C:\Program Files\nodejs\npm.cmd' install electron --allow-scripts=electron
-& 'C:\Program Files\nodejs\node.exe' build-portable.js
-# 产物：D:\1111\superagent-app\Superagent\Superagent.exe
+```bat
+cd /d D:\1111\superagent-app
+set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+"C:\Program Files\nodejs\npm.cmd" install --no-audit --no-fund
+"C:\Program Files\nodejs\node.exe" build-portable.js
+:: 产物：D:\1111\superagent-app\Superagent\Superagent.exe
 ```
 
-- 只需 Node（Electron 的二进制在该目录的 `node_modules` 里），**目标机器不需要预装 Node/Electron**——整个 `Superagent\` 文件夹可整体复制到别处使用。
+- **目标机器不需要 Node/Electron/npm**——整个 `Superagent\` 文件夹可整体复制到别处使用。但**后端不在应用里**：应用仍需要机器上已装好的 Node + 全局 `@deepseek-ai/dsh`（本机就是这种情况）。
+- 若 `node_modules\electron\dist\electron.exe` 不存在（下载失败），按 `README.md` §6 手动解压 Electron 缓存 zip，并写 `path.txt`。
 - 应用启动时会 `where git`/`where gh` 并按已知目录兜底，找到就**前置到后端子进程的 PATH**；两者都没有时会显示横幅（见 2.2）。
-- 如果 npm 不认 `--allow-scripts` 参数，先 `npm.cmd install electron`，再运行 `node build-portable.js`；关键是 Electron 的 dist 必须下载完整。
-- 创建桌面快捷方式（无需管理员）：
+- **必须带启动参数** `--no-sandbox --disable-gpu`：本机 Chromium 不加这两个参数会在 JS 跑起来之前崩溃（Electron 33/44 均如此）。快捷方式与 `启动 Superagent.cmd` 已经内置。
+- 创建/修复桌面快捷方式（无需管理员，**注意 Arguments 与工作目录**）：
   ```powershell
   $ws = New-Object -ComObject WScript.Shell
   $lnk = $ws.CreateShortcut("$env:USERPROFILE\Desktop\Superagent.lnk")
   $lnk.TargetPath = 'D:\1111\superagent-app\Superagent\Superagent.exe'
+  $lnk.Arguments = '--no-sandbox --disable-gpu'
   $lnk.WorkingDirectory = 'D:\1111\superagent-app\Superagent'
-  $lnk.IconLocation = 'D:\1111\superagent-app\Superagent\Superagent.exe,0'
+  $lnk.IconLocation = 'D:\1111\superagent-app\Superagent\resources\app\icon.ico,0'
   $lnk.Save()
+  # 开始菜单副本（可选）：
+  $menu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Superagent"
+  New-Item -ItemType Directory -Force $menu | Out-Null
+  Copy-Item "$env:USERPROFILE\Desktop\Superagent.lnk" (Join-Path $menu 'Superagent.lnk')
   ```
-- ⏳ 产物路径与"双击可启动"以桌面应用负责人的验收结论为准（第 12 节）。
+- 重建前先关掉应用（运行中的 `Superagent.exe` 会锁住目录）。只改 `main.js` 时重跑 `build-portable.js` 即可。
+- 验收结果见 12.1（窗口标题、URL 捕获、面板渲染截图、单实例、退出无残留进程）。
 
 ### 3.7 装配完成检查单
 
@@ -526,6 +537,9 @@ D:\1111\toolchain\gh\bin\gh.exe        # v2.103.3，满足 >= 2.48
 智能体的 gh 配置目录 = C:\Users\Chen\.dsh\state\superagent\gh-config
 ```
 
+> 这个目录**由插件拥有**（`<stateDir>` 下、启动时创建），当前版本叫 `gh-config`；应用本身从不设置 `GH_CONFIG_DIR`。
+> 如果未来插件换了目录名，以 `<stateDir>` 下实际存在的那一个为准；第一次登录前没有它时，手动建一下或先启动一次后端即可。
+
 结果：setup 检查和每个 worker Session 读的都是**智能体**的 gh 配置，**你自己的 `gh` 登录不受影响、也不会被智能体使用**。
 
 ### 6.5 创建包装器 `gh-agent.cmd`（仅用于登录/自查，不是面板 CLI）
@@ -629,7 +643,7 @@ set "GH_CONFIG_DIR=C:\Users\Chen\.dsh\state\superagent\gh-config"
 
 ### 7.1 打开面板
 
-- **桌面应用**：双击 `Superagent.exe`，窗口先显示"正在启动 Superagent…"，就绪后换成面板。**侧栏点 Superagent**。
+- **桌面应用**：双击桌面快捷方式 `Superagent.lnk`，窗口先显示"正在启动 Superagent…"，约 5 秒后就绪并换成面板。**侧栏点 Superagent**。
 - **CLI 路径**：日志里会打印 `dsh web: http://127.0.0.1:3082/?token=…`；浏览器打开**带 token 的 URL**（裸 URL 是 401，这是设计如此）。
 - 顶部 **Overview** 会列出还缺什么，并链接到对应设置。**setup 没通过之前，轮询和工作都不会开始。**
 
@@ -793,7 +807,9 @@ Invoke-RestMethod "$api/state" -Headers $h | ConvertTo-Json -Depth 6
 
 | 操作 | 怎么做 |
 | --- | --- |
-| 启动 | 双击桌面 `Superagent.lnk` 或 `D:\1111\superagent-app\Superagent\Superagent.exe` |
+| 启动（正常） | 双击桌面快捷方式 `%USERPROFILE%\Desktop\Superagent.lnk`（开始菜单里也有副本） |
+| 启动（兜底） | `D:\1111\superagent-app\启动 Superagent.cmd`（同样带必需参数） |
+| 直接运行 exe | 只建议排查时用；**必须带** `--no-sandbox --disable-gpu`，否则本机 Chromium 会在 JS 之前崩溃：<br>`& 'D:\1111\superagent-app\Superagent\Superagent.exe' --no-sandbox --disable-gpu` |
 | 看菜单 | 菜单栏默认隐藏，**按一下 `Alt`** 才出现 |
 | 重启后端 | **Ctrl+Shift+R**，或 文件 → 重启后端 |
 | 重新加载页面 | **Ctrl+R**（强制：Ctrl+Shift+F5） |
@@ -802,13 +818,14 @@ Invoke-RestMethod "$api/state" -Headers $h | ConvertTo-Json -Depth 6
 | 退出 | 关窗口 / 文件 → 退出 / **Alt+F4** |
 | 重复启动 | 单实例：第二次双击只会把已有窗口调到前台，不会起第二个后端 |
 
-行为要点（🔧 源码确认）：
+行为要点（✅ 已验收，依据 `superagent-app\README.md` §5/§8）：
 
-- 启动先显示"正在启动 Superagent…"，等后端打印带 token 的 URL 后自动载入；**裸 URL 是 401，属正常设计**。
-- 后端 90 秒内没给出 URL → 显示"后端启动超时"错误页，附最近输出。
-- 后端异常退出 → 错误页显示退出码/信号和最近输出，按 Ctrl+Shift+R 可重启。
-- 退出时会先让后端优雅收尾（`kill()`），2 秒还没退就 `taskkill /PID <pid> /T /F` 兜底；正常退出后**不应残留 node.exe**。
-- 窗口大小/位置/最大化会记住。
+- 启动立刻显示"正在启动 Superagent…"，约 5 秒内抓到 `dsh web: http://127.0.0.1:<port>/?token=…` 并载入；**裸 URL 是 401（设计如此）**，token URL → 303 → 写 cookie → 200。
+- 后端 90 秒内没给出 URL → 显示"后端启动超时"错误页，附**确切的启动命令**与最近输出。
+- 后端异常退出 → 同样风格的错误页（退出码/信号 + 输出尾部），提示按 Ctrl+Shift+R；**不自动重试**（避免崩溃循环掩盖原因）。
+- 退出：先 SIGTERM，2 秒未退则 `taskkill /PID <pid> /T /F`（另有 8 秒硬上限）；`process.on('exit')`/未捕获异常也会清进程树。实测退出后 **0 个 Superagent 进程、0 个 dsh node 进程**。
+- 窗口默认 1280×860（最小 960×640），大小/位置/最大化会记住；外部链接用系统浏览器打开；权限只放行剪贴板/通知/全屏。
+- **后端不在应用里**：应用只负责找 Node + 全局 `@deepseek-ai/dsh` 并启动它；找不到时错误页会说明缺什么（也可用 `SUPERAGENT_NODE` / `SUPERAGENT_DSH_BIN` 指定）。
 
 ### 8.2 排障 / 无人值守：CLI 服务管理器
 
@@ -863,9 +880,11 @@ node "C:\Users\Chen\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh\lib\bin.js
 - **不带 `?token=` 的裸 URL 返回 401**，这是 DSH 的正常行为，不是故障
 - CLI 路径（`scripts\dsh-superagent.cmd`）**不加** `--patch`，所以用 profile 的 3082；它用 `--import scripts\dsh-service-hook.mjs` 预加载停止钩子（不设控制管道变量时完全惰性），所以能被 `stop` 优雅停止
 - 一个 `stateDir` 同时只能有一个后端（`Lock file is already being held`）
-- 应用支持的排障用环境变量（一般不用设）：`SUPERAGENT_PROFILE`（默认 `superagent`）、`SUPERAGENT_PORT`（默认 `0`）、
-  `SUPERAGENT_STATE_DIR`（写进 overlay，换一个独立 `stateDir`）、`SUPERAGENT_NODE`、`SUPERAGENT_DSH_BIN`、
-  `SUPERAGENT_DESKTOP_ROOT`、`SUPERAGENT_CWD`、`SUPERAGENT_START_TIMEOUT_MS`（默认 90000）
+- 应用支持的排障用环境变量（一般不用设，完整表见 `superagent-app\README.md` §6）：`SUPERAGENT_PROFILE`（默认 `superagent`）、`SUPERAGENT_PORT`（默认 `0`）、
+  `SUPERAGENT_STATE_DIR`（写进 overlay，换一个独立 `stateDir`，用于排查"锁被占"）、`SUPERAGENT_USER_DATA`（强制用户数据目录）、
+  `SUPERAGENT_NODE`、`SUPERAGENT_DSH_BIN`、`SUPERAGENT_DESKTOP_ROOT`、`SUPERAGENT_CWD`、`SUPERAGENT_START_TIMEOUT_MS`（默认 90000）、
+  `SUPERAGENT_SCREENSHOT=1`（每次页面加载约 4 秒后截一张 `screenshot.png`）
+- 用户数据目录按顺序取第一个可写的：`%SUPERAGENT_USER_DATA%` → `%APPDATA%\Superagent` → `<exe 所在目录>\user-data` → `%TEMP%\superagent-user-data`
 - overlay 优先写到 `<userData>\runtime.patch.yml`；不可写时依次退到应用目录、系统临时目录
 
 启动后 `GET /orchestrator/api/state` 的典型待配置状态（✅ 实测，`stateDir` 用临时目录、端口用 `--patch` 换到 3099）：
@@ -911,10 +930,15 @@ curl.exe -s -H "x-orchestrator-request: 1" http://127.0.0.1:3099/orchestrator/ap
 
 ### 8.5 日志都在哪
 
+应用的用户数据目录（正常情况）：`C:\Users\Chen\AppData\Roaming\Superagent\`；受限令牌下退到 `<exe 所在目录>\user-data\`。
+
 | 日志 | 位置 | 用途 |
 | --- | --- | --- |
-| 应用生命周期 | `<userData>\app.log` | 启动命令、PID、URL、退出码、重启 |
+| 应用生命周期 | `<userData>\app.log` | 启动命令/工作目录、PID、preflight 结果（找到的 git/gh 目录）、后端 URL、页面加载、退出码 |
 | 后端原始输出 | `<userData>\backend.log` | 插件启动错误、setup 报错、`dsh web:` 行 |
+| 窗口状态 | `<userData>\window-state.json` | 位置/大小/最大化（只恢复到仍在屏幕上的位置） |
+| 端口 overlay | `<userData>\runtime.patch.yml` | 应用生成的端口覆盖配置，**不要手改** |
+| 调试截图 | `<userData>\screenshot.png` | 仅 `SUPERAGENT_SCREENSHOT=1` 时 |
 | CLI 服务日志 | `<checkout>\.artifacts\dsh-superagent-superagent-*.log` | CLI 路径启动的后端 |
 | DSH 启动诊断 | `C:\Users\Chen\.dsh\logs\startup-<ISO时间>-<随机>.log` | 插件未激活/端口占用等启动失败详情 ✅ 实测存在 |
 
@@ -1018,6 +1042,8 @@ Otherwise (exit 1) run `D:\1111\dsh-superagent\scripts\dsh-superagent.cmd --prof
 | 症状 | 原因与处理 |
 | --- | --- |
 | 双击应用后一直"正在启动 Superagent…" | 90 秒后应出错误页。看 `backend.log` 最后几行；最常见是 git 不在 PATH 导致 setup 失败、或 dsh 版本不对 |
+| 应用错误页出现 `EPERM ... cordis.yml` / 无法写 `%USERPROFILE%\.dsh` | 应用运行在**受限（Low-integrity）令牌**下（例如从自动化/沙箱上下文启动），Electron 写不了你的用户目录。正常双击桌面快捷方式不受此限制；排障时可用 `DSH_HOME` 指向可写目录 + `SUPERAGENT_STATE_DIR` 指向临时状态目录（这正是应用验收时的做法，**不要**用于正式数据） |
+| 直接双击 `Superagent.exe` 后窗口一闪而过/崩溃 | 少了 `--no-sandbox --disable-gpu`。用桌面快捷方式或 `启动 Superagent.cmd`，它们已内置这两个参数 |
 | 启动页/面板顶部出现横幅"未找到 git (Git for Windows) / gh (GitHub CLI)" | 应用没找到 git/gh，GitHub 集成不可用。按 2.4 加进 User PATH，然后 **Ctrl+Shift+R** 重启后端 |
 | 应用错误页提示"另一个 Superagent 后端正在运行并占用同一 stateDir" | 先关掉别的实例；或设 `SUPERAGENT_STATE_DIR` 指向独立状态目录再启动（排障用，不要用于正式数据） |
 | 应用错误页提示"端口被占用 … 若你设置了 SUPERAGENT_PORT" | 把 `SUPERAGENT_PORT` 改回 `0`（应用应使用系统分配端口） |
@@ -1079,20 +1105,25 @@ Otherwise (exit 1) run `D:\1111\dsh-superagent\scripts\dsh-superagent.cmd --prof
 | `.cmd` 不能被无 shell 地 spawn | Node ≥18.20/20.12 起（CVE-2024-27980）抛 `EINVAL`；所以面板 CLI 必须是 `.exe` |
 | 准备命令容器 | Windows 为 `cmd.exe /d /s /c <command>`；POSIX 仍 `sh -c`；Git for Windows 的 `sh.exe` 不在 PATH 上，POSIX 写法不能沿用 |
 | 端口/`--patch` 规则 | `--port` 输给 profile 的 `webserver.port`；`--patch` 是启动器参数，必须排在应用参数之前；`--no-open --patch` 报 `unknown option` |
-| 单实例 | 同一 `stateDir` 第二个实例 `Lock file is already being held` |
+| stateDir 单实例 | 同一 `stateDir` 第二个后端 `Lock file is already being held` |
 | 面板后端行为 | `dsh web: http://127.0.0.1:<port>/?token=…` 打印；裸 URL 401；`GET /orchestrator/api/state` 200，待配置状态为 `setup.problem.code = repositoryUnset` + `health.runtime = paused/setupPending` |
+| 桌面应用启动与面板渲染（应用负责人验收，`superagent-app\README.md` §8） | 快捷方式参数启动后窗口标题 `Superagent`；约 5 秒抓到 backend URL；`did-finish-load http://127.0.0.1:<port>/`、`document.title = DeepSeek Harness`；截图 `D:\1111\superagent-app\verification\panel-rendered.png` 显示 Superagent 概览/来源/触发/评估/执行/设置 面板（`repositoryUnset` 是插件的正常待配置状态） |
+| token URL 语义 | token URL → 303 → 写 cookie → 200；裸 root → 401（设计如此） |
+| 应用单实例 | 第二次启动只聚焦已有窗口，不启动第二个后端 |
+| 优雅退出 | `SIGTERM` → backend exited，应用约 1 秒退出；事后 **0 个 Superagent + 0 个 dsh node 进程** |
+| 窗口状态 | 关闭时写 `window-state.json`（如 `{"x":640,"y":266,"width":1280,"height":860,"maximized":false}`） |
+| git/gh preflight | 实测解析到 `git: D:\1111\toolchain\git\cmd`、`gh: D:\1111\toolchain\gh\bin`（Explorer PATH 里都没有，靠已知目录兜底） |
+| 便携应用 | `Superagent\` = 368 MB，Electron 44.7.0，自包含；`--no-sandbox --disable-gpu` 为必需参数 |
 
 ### 12.2 还没验证的（写了做法，但没人跑完）
 
 | 项 | 说明 |
 | --- | --- |
-| 桌面应用成品 | `D:\1111\superagent-app\Superagent\Superagent.exe` 已构建（约 250 MB 便携目录）；"双击 → 启动 → 面板可交互 → 退出无残留 node"整链由桌面应用负责人验收，本机尚无运行日志 |
-| 应用 userData 目录名 | 代码用 Electron `app.getPath('userData')`；按 `productName: Superagent` 推断是 `%APPDATA%\Superagent`，也可能取 `name`（`superagent-desktop`）。**以应用内 帮助 → 关于 Superagent 显示的路径为准** |
-| 应用自动探测/注入 git、gh | 源码已实现（候选目录与横幅文案见 2.2），但 GUI 行为未验收 |
-| 应用构建参数 `--allow-scripts=electron` | 若 npm 不认该参数，先 `npm.cmd install electron` 再 `node build-portable.js` |
+| 正常桌面用户双击的真实路径 | 应用负责人的验收是在**自动化/受限令牌**下做的（Electron 拿到 Low-integrity 令牌写不了 `%USERPROFILE%\.dsh`，所以当时用了 `DSH_HOME=D:\1111\run\dsh-home` + `SUPERAGENT_STATE_DIR=D:\1111\run\app-test-state`）。**正常用户从自己桌面双击**预期不受此限制，但这一步没人跑过；首次使用请以"能否打开面板且 Overview 不报 EPERM"为准 |
 | 端到端首单 | "智能体账户登录 + 面板填仓库/CLI → 允许列表 @ 一下 → 1 分钟内出 Ticket → PR"整链尚未完整实测 |
 | winget id 与 `--scope user` | 当前无网络/不能提权，未验证；以官方安装器的"当前用户"选项为准 |
-| 面板中文文案与按钮位置 | 依据 `src/client/locales.ts` 与源码确认；可视 UI 验收未做（应用窗口内位置可能有差异） |
+| 面板设置页交互 | 面板**渲染**已验证（截图）；Sources/Policy/Execution/Prompts 的逐项点击与保存流程未在应用窗口里逐项走过（字段与语义依据源码/上游文档） |
+| 应用构建的可重复性 | 本机产物已验收；在一台**干净机器**上从零 `npm install electron` + `build-portable.js` 未验证（Electron 下载可能需要镜像，见 3.6） |
 
 ### 12.3 已知风险 / 运维注意
 
@@ -1111,9 +1142,12 @@ Otherwise (exit 1) run `D:\1111\dsh-superagent\scripts\dsh-superagent.cmd --prof
 | 名称 | 路径 |
 | --- | --- |
 | 本 checkout | `D:\1111\dsh-superagent` |
-| 桌面应用 | `D:\1111\superagent-app\Superagent\Superagent.exe` |
-| 应用源码 | `D:\1111\superagent-app` |
-| 应用日志 | `<userData>\app.log`、`<userData>\backend.log`（目录名以应用内 关于 对话框为准，见 12.2） |
+| 桌面应用 | `D:\1111\superagent-app\Superagent\Superagent.exe`（便携目录 368 MB，Electron 44.7.0） |
+| 桌面快捷方式 | `%USERPROFILE%\Desktop\Superagent.lnk`；开始菜单 `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Superagent\Superagent.lnk` |
+| 兜底启动器 | `D:\1111\superagent-app\启动 Superagent.cmd` |
+| 应用源码 / 说明 | `D:\1111\superagent-app`（以其 `README.md` 为准；验收证据在 `verification\`） |
+| 应用用户数据（正常） | `C:\Users\Chen\AppData\Roaming\Superagent\`（`app.log`、`backend.log`、`window-state.json`、`runtime.patch.yml`） |
+| 应用用户数据（受限令牌兜底） | `<Superagent.exe 所在目录>\user-data\`，再兜底 `%TEMP%\superagent-user-data` |
 | DSH home | `C:\Users\Chen\.dsh` |
 | profile | `C:\Users\Chen\.dsh\profiles\superagent` |
 | 机器配置 | `C:\Users\Chen\.dsh\profiles\superagent\cordis.patch.yml` |
@@ -1161,10 +1195,11 @@ Invoke-RestMethod 'http://127.0.0.1:3082/orchestrator/api/state' -Headers $h
 # --- 端口占用 ---
 Get-NetTCPConnection -LocalPort 3082 -ErrorAction SilentlyContinue | Select-Object LocalAddress,State,OwningProcess
 
-# --- 应用构建 ---
-Set-Location D:\1111\superagent-app
-& 'C:\Program Files\nodejs\npm.cmd' install electron
-& 'C:\Program Files\nodejs\node.exe' build-portable.js
+# --- 应用构建/更新（先关掉应用，避免目录被锁）---
+cd /d D:\1111\superagent-app
+set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+"C:\Program Files\nodejs\npm.cmd" install --no-audit --no-fund
+"C:\Program Files\nodejs\node.exe" build-portable.js
 ```
 
 ### 13.3 升级

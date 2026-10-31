@@ -1,0 +1,18 @@
+{
+  "name": "superagent-desktop",
+  "productName": "Superagent",
+  "version": "1.0.0",
+  "description": "Portable Windows desktop shell for the DeepSeek Harness superagent profile",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "package": "node build-portable.js"
+  },
+  "devDependencies": {
+    "electron": "44.7.0"
+  },
+  "allowScripts": {
+    "electron": true
+  }
+}

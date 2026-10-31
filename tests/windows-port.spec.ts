@@ -1,14 +1,18 @@
 // Temporary verification of the Windows port of src/infra/environment.ts.
 // Run with: `pnpm vitest run verify-shim.test.ts`
 import { readdir, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { agentGhConfig, agentVariables, workerBin, workerGitConfig, writeEnvironment } from '../src/infra/environment.ts'
 
-const stateDir = 'D:/1111/run/shim-test'
+// Every path is derived, so this contract test runs on any machine.
+const stateDir = join(tmpdir(), 'dsh-superagent-windows-port')
+const cli = join(tmpdir(), 'dsh-superagent-fake-tools', 'gh.exe')
 const deployment = {
   stateDir,
   repository: 'acme/widgets',
-  github: { cli: 'D:/1111/toolchain/gh/bin/gh.exe', login: 'agent-bot', noreply: '1+agent-bot@users.noreply.github.com' },
+  github: { cli, login: 'agent-bot', noreply: '1+agent-bot@users.noreply.github.com' },
 }
 
 it('writes batch shims, recognises its own marker, and isolates the agent account', async () => {
@@ -24,7 +28,7 @@ it('writes batch shims, recognises its own marker, and isolates the agent accoun
   const gh = await readFile(`${workerBin(stateDir)}/gh.cmd`, 'utf8')
   console.log('--- gh.cmd ---\n' + gh)
   expect(gh.startsWith('@echo off\r\n')).toBe(true)
-  expect(gh).toContain('"D:/1111/toolchain/gh/bin/gh.exe" %*')
+  expect(gh).toContain('"' + cli + '" %*')
   expect(gh).toContain('Written by dsh-superagent')
 
   const blocked = await readFile(`${workerBin(stateDir)}/python.cmd`, 'utf8')

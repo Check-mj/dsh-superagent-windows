@@ -3,3 +3,8 @@ lib/
 .artifacts/
 .env
 coverage/
+
+# Windows desktop application: build outputs and local state, not sources.
+windows-app/Superagent/
+windows-app/verification/
+windows-app/node_modules/
