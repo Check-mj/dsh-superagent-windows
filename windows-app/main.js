@@ -247,7 +247,7 @@ function childEnv(tools) {
   if (!env.SUPERAGENT_GIT_SSH) {
     try {
       const sshConfig = path.join(require('node:os').homedir(), '.ssh', 'config');
-      if (fs.existsSync(sshConfig) && /^\s*Host\s+github\.com/im.test(fs.readFileSync(sshConfig, 'utf8'))) {
+      if (fs.existsSync(sshConfig) && /^\s*Host\s+github\.com\b/im.test(fs.readFileSync(sshConfig, 'utf8'))) {
         env.SUPERAGENT_GIT_SSH = '1';
         log('[preflight] worker git transport: SSH (~/.ssh/config routes github.com)');
       } else {
