@@ -188,8 +188,8 @@ winget search python            # 例：Python.Python.3.12（本机已装 3.12.1
 
 # 追加（示例：git 的 cmd 目录；gh 同理换成它自己的目录）
 $dirs = @(
-  '%LOCALAPPDATA%\Programs\Git\cmd',
-  '%LOCALAPPDATA%\Programs\GitHub CLI'
+  "$env:LOCALAPPDATA\Programs\Git\cmd",
+  "$env:LOCALAPPDATA\Programs\GitHub CLI"
 )
 $old = [Environment]::GetEnvironmentVariable('Path','User')
 $add = ($dirs | Where-Object { $old -notlike "*$_*" }) -join ';'
@@ -264,7 +264,7 @@ Test-Path .\lib        # True
 ### 3.4 创建 profile（⚠️ 本机已存在，**绝对不要重跑**）
 
 ```powershell
-# 仅当 %USERPROFILE%\.dsh\profiles\superagent 不存在时才执行：
+# 仅当 "$env:USERPROFILE\.dsh\profiles\superagent" 不存在时才执行：
 & $dsh superagent --from-default-profile web --dump-config > $null
 ```
 
@@ -273,7 +273,7 @@ Test-Path .\lib        # True
 - **重跑会重建整个 profile，并删掉手写的 `cordis.patch.yml`（包括端口、stateDir、模型配置）。** 升级永远不要用它。
 - 判断能否执行：
   ```powershell
-  Test-Path %USERPROFILE%\.dsh\profiles\superagent\cordis.patch.yml   # True = 已存在，跳过本步
+  Test-Path "$env:USERPROFILE\.dsh\profiles\superagent\cordis.patch.yml"   # True = 已存在，跳过本步
   ```
 
 ### 3.5 把插件 link 进 profile（✅ 已完成）
@@ -558,8 +558,8 @@ C:\path\to\gh.exe        # v2.103.3，满足 >= 2.48
 包装器只是给你手动用的便利工具；**不要把它填进面板**（原因见 6.4）。在 `%USERPROFILE%\bin` 下创建：
 
 ```powershell
-New-Item -ItemType Directory -Force -Path '%USERPROFILE%\bin' | Out-Null
-notepad '%USERPROFILE%\bin\gh-agent.cmd'
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\bin" | Out-Null
+notepad "$env:USERPROFILE\bin\gh-agent.cmd"
 ```
 
 粘贴以下内容（**CRLF 换行**，Notepad 默认就是）。**注意 `GH_CONFIG_DIR` 那一行要与本机 `stateDir` 对应**：
@@ -592,7 +592,7 @@ exit /b %ERRORLEVEL%
 **方式 1：直接用 gh.exe + 一次性 `GH_CONFIG_DIR`**
 
 ```powershell
-$agentHome = '%USERPROFILE%\.dsh\state\superagent\gh-config'
+$agentHome = "$env:USERPROFILE\.dsh\state\superagent\gh-config"
 New-Item -ItemType Directory -Force $agentHome | Out-Null
 
 # 只对当前窗口生效；关掉窗口就恢复（不要用 setx！见下）
@@ -613,8 +613,8 @@ set "GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\superagent\gh-config"
 **方式 2：用 6.5 的包装器**
 
 ```powershell
-& '%USERPROFILE%\bin\gh-agent.cmd' auth login --hostname github.com --git-protocol https --web
-& '%USERPROFILE%\bin\gh-agent.cmd' api user --jq .login
+& "$env:USERPROFILE\bin\gh-agent.cmd" auth login --hostname github.com --git-protocol https --web
+& "$env:USERPROFILE\bin\gh-agent.cmd" api user --jq .login
 ```
 
 注意事项：
@@ -622,13 +622,13 @@ set "GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\superagent\gh-config"
 - 浏览器里**必须登录智能体账户**（用无痕窗口，别用你已登录的个人账户，否则会把智能体账户换成你的）。
 - 也可以用 token（不要在任何地方贴 token；用完删除临时文件）：
   ```powershell
-  & '%USERPROFILE%\bin\gh-agent.cmd' auth login --hostname github.com --with-token < %USERPROFILE%\agent-token.txt
-  Remove-Item %USERPROFILE%\agent-token.txt
+  & "$env:USERPROFILE\bin\gh-agent.cmd" auth login --hostname github.com --with-token < "$env:USERPROFILE\agent-token.txt"
+  Remove-Item "$env:USERPROFILE\agent-token.txt"
   ```
 - **不要**用 `setx GH_CONFIG_DIR …` 把它设成全局环境变量：那会污染你终端里所有 `gh` 命令（它们会指向智能体账号），而且对插件没有必要。
 - 验证推送权限（插件保存时会做同样的检查）：
   ```powershell
-  $env:GH_CONFIG_DIR = '%USERPROFILE%\.dsh\state\superagent\gh-config'
+  $env:GH_CONFIG_DIR = "$env:USERPROFILE\.dsh\state\superagent\gh-config"
   & 'C:\path\to\gh.exe' api repos/<owner>/<name> --jq '.permissions.push'   # true
   Remove-Item Env:GH_CONFIG_DIR
   ```
@@ -694,16 +694,16 @@ GitHub 卡片里填：
 #### 7.4.1 先准备一个"本地 clone"作为 worktree 基座
 
 ```powershell
-New-Item -ItemType Directory -Force '%USERPROFILE%\src' | Out-Null
-git clone https://github.com/<owner>/<name>.git '%USERPROFILE%\src\widgets'
+New-Item -ItemType Directory -Force "$env:USERPROFILE\src" | Out-Null
+git clone https://github.com/<owner>/<name>.git "$env:USERPROFILE\src\widgets"
 
 # 关键：clone 的本地配置里不能留凭据（插件会检查，发现就判该工单失败）
-git -C '%USERPROFILE%\src\widgets' config --local --get-regexp '^(credential\.|http\..*extraheader)'
+git -C "$env:USERPROFILE\src\widgets" config --local --get-regexp '^(credential\.|http\..*extraheader)'
 # 上面这条“有输出”就要清掉，例如：
-# git -C '%USERPROFILE%\src\widgets' config --local --unset-all credential.https://github.com.helper
+# git -C "$env:USERPROFILE\src\widgets" config --local --unset-all credential.https://github.com.helper
 
 # 若 clone 时 URL 里带过 token，务必改回干净地址：
-git -C '%USERPROFILE%\src\widgets' remote set-url origin https://github.com/<owner>/<name>.git
+git -C "$env:USERPROFILE\src\widgets" remote set-url origin https://github.com/<owner>/<name>.git
 ```
 
 - 智能体工作时用的是**它自己的** git 配置（`<stateDir>\worker-gitconfig` + `gh-config` 凭据），不读你全局的 git 配置；所以个人代理、commit 身份等设置都不会带进去。
@@ -713,7 +713,7 @@ git -C '%USERPROFILE%\src\widgets' remote set-url origin https://github.com/<own
 
 上游是 sh 写法（`$DSH_SUPERAGENT_*` + `&&`）。Windows 上准备命令通过 **`cmd.exe /d /s /c`** 执行，所以要用 `%VAR%` 和 cmd 语法。因为 cmd 没有 `${VAR:-默认值}` 这种"空值取默认"的写法，**推荐写成 `.cmd` 包装器**（下面的脚本会处理 PR head 为空的情况）。
 
-创建 `%USERPROFILE%\bin\prepare-ticket.cmd`（**CRLF 换行**）：
+创建 `C:\Users\<you>\bin\prepare-ticket.cmd`（**CRLF 换行**）：
 
 ```bat
 @echo off
@@ -740,7 +740,7 @@ exit /b 0
 然后在面板 **准备命令** 里填（路径无空格时不必加引号；有空格时写成 `"C:\path with space\prepare-ticket.cmd"`）：
 
 ```
-%USERPROFILE%\bin\prepare-ticket.cmd
+C:\Users\<you>\bin\prepare-ticket.cmd
 ```
 
 用到的执行环境变量（面板里点变量名可直接插入）：
@@ -818,9 +818,9 @@ Invoke-RestMethod "$api/state" -Headers $h | ConvertTo-Json -Depth 6
 
 | 操作 | 怎么做 |
 | --- | --- |
-| 启动（正常） | 双击桌面快捷方式 `%USERPROFILE%\Desktop\Superagent.lnk`（开始菜单里也有副本） |
-| 启动（兜底） | `<checkout>\windows-app\启动 Superagent.cmd`（同样带必需参数） |
-| 直接运行 exe | 只建议排查时用；**必须带** `--no-sandbox --disable-gpu`，否则本机 Chromium 会在 JS 之前崩溃：<br>`& '<checkout>\windows-app\Superagent\Superagent.exe' --no-sandbox --disable-gpu` |
+| 启动（正常） | 双击桌面快捷方式 `%USERPROFILE%\Desktop\Superagent.lnk`（开始菜单 `…\Programs\Superagent\Superagent.lnk` 也有副本）；快捷方式由 `install.cmd` 生成，目标=安装根目录的 `Superagent.exe`，参数 `--no-sandbox --disable-gpu` |
+| 启动（源码目录 / 未安装时） | `<checkout>\windows-app\启动 Superagent.cmd`（同样带必需参数） |
+| 直接运行 exe | 只建议排查时用；**必须带** `--no-sandbox --disable-gpu`：<br>`& "$env:LOCALAPPDATA\Programs\Superagent\Superagent.exe" --no-sandbox --disable-gpu` |
 | 看菜单 | 菜单栏默认隐藏，**按一下 `Alt`** 才出现 |
 | 重启后端 | **Ctrl+Shift+R**，或 文件 → 重启后端 |
 | 重新加载页面 | **Ctrl+R**（强制：Ctrl+Shift+F5） |
@@ -828,15 +828,17 @@ Invoke-RestMethod "$api/state" -Headers $h | ConvertTo-Json -Depth 6
 | 打开日志目录 | 文件 → 打开日志文件夹（或 帮助 → 打开日志文件夹） |
 | 退出 | 关窗口 / 文件 → 退出 / **Alt+F4** |
 | 重复启动 | 单实例：第二次双击只会把已有窗口调到前台，不会起第二个后端 |
+| 移动/重装修复 | 关应用 → 重跑 `<checkout>\windows-app\install.cmd -Force`（重写 `config\paths.json` 与快捷方式） |
 
-行为要点（✅ 已验收，依据 `superagent-app\README.md` §5/§8）：
+行为要点（依据 `<checkout>\windows-app\README.md` 与验收时的日志/截图）：
 
 - 启动立刻显示"正在启动 Superagent…"，约 5 秒内抓到 `dsh web: http://127.0.0.1:<port>/?token=…` 并载入；**裸 URL 是 401（设计如此）**，token URL → 303 → 写 cookie → 200。
 - 后端 90 秒内没给出 URL → 显示"后端启动超时"错误页，附**确切的启动命令**与最近输出。
 - 后端异常退出 → 同样风格的错误页（退出码/信号 + 输出尾部），提示按 Ctrl+Shift+R；**不自动重试**（避免崩溃循环掩盖原因）。
-- 退出：先 SIGTERM，2 秒未退则 `taskkill /PID <pid> /T /F`（另有 8 秒硬上限）；`process.on('exit')`/未捕获异常也会清进程树。实测退出后 **0 个 Superagent 进程、0 个 dsh node 进程**。
+- 退出：先 SIGTERM，2 秒未退则 `taskkill /PID <pid> /T /F`（另有 8 秒硬上限）；`process.on('exit')`/未捕获异常也会清进程树。验收时退出后 **0 个 Superagent 进程、0 个 dsh node 进程**。
 - 窗口默认 1280×860（最小 960×640），大小/位置/最大化会记住；外部链接用系统浏览器打开；权限只放行剪贴板/通知/全屏。
 - **后端不在应用里**：应用只负责找 Node + 全局 `@deepseek-ai/dsh` 并启动它；找不到时错误页会说明缺什么（也可用 `SUPERAGENT_NODE` / `SUPERAGENT_DSH_BIN` 指定）。
+- **完整性级别**：本机这类环境里，从受限上下文启动 Electron 会拿到 Low-integrity 令牌，写不了 `%USERPROFILE%\.dsh` → 后端以 `EPERM … cordis.yml` 退出 1；应用检测到 Low IL 会在错误页给出对应提示。**正常从 Explorer 双击（Medium IL）预期没问题——但这一点还没有被一次普通双击验证过**（见 12.2），可用 `DSH_HOME` 指向可写目录 + `SUPERAGENT_STATE_DIR` 做排障。
 
 ### 8.2 排障 / 无人值守：CLI 服务管理器
 
@@ -880,22 +882,23 @@ Set-Location <checkout>
 
 桌面应用不经过 shell，直接 spawn（🔧 源码确认；端口、token、启动顺序均已 ✅ 实测）：
 
-```
-node "%APPDATA%\npm\node_modules\@deepseek-ai\dsh\lib\bin.js" ^
-     --profile superagent --patch "<userData>\runtime.patch.yml" --no-open
+```powershell
+$dshBin = "$env:APPDATA\npm\node_modules\@deepseek-ai\dsh\lib\bin.js"
+node $dshBin --profile superagent --patch "<userData>\runtime.patch.yml" --no-open
 ```
 
 - **`--patch` 必须写在应用自己的参数（`--no-open` 等）前面**；反过来会报 `unknown option '--patch'`
-- `<userData>\runtime.patch.yml` 里是 `webserver: 127.0.0.1 + port: 0` → **随机空闲端口**
+- `<userData>\runtime.patch.yml` 里是 `webserver: 127.0.0.1 + port: 0` → **随机空闲端口**；要提高固定端口就用 `SUPERAGENT_PORT`
 - 后端在 stdout 打印：`dsh web: http://127.0.0.1:<port>/?token=<token>`，应用用正则抓它并加载
 - **不带 `?token=` 的裸 URL 返回 401**，这是 DSH 的正常行为，不是故障
-- CLI 路径（`scripts\dsh-superagent.cmd`）**不加** `--patch`，所以用 profile 的 3082；它用 `--import scripts\dsh-service-hook.mjs` 预加载停止钩子（不设控制管道变量时完全惰性），所以能被 `stop` 优雅停止
+- 后端的**工作目录**由应用解析（不是写死的）：`SUPERAGENT_CWD`/`SUPERAGENT_CHECKOUT` → `<root>\config\paths.json` 记录 → exe 附近布局搜索（用 `package.json` 的 `"name": "dsh-superagent"` 校验）→ profile 目录 → 用户目录；顺序细节见 `windows-app\INSTALL.md` §3.1
+- CLI 路径（`<checkout>\scripts\dsh-superagent.cmd`）**不加** `--patch`，所以用 profile 的 3082；它用 `--import scripts\dsh-service-hook.mjs` 预加载停止钩子（不设控制管道变量时完全惰性），所以能被 `stop` 优雅停止
 - 一个 `stateDir` 同时只能有一个后端（`Lock file is already being held`）
-- 应用支持的排障用环境变量（一般不用设，完整表见 `superagent-app\README.md` §6）：`SUPERAGENT_PROFILE`（默认 `superagent`）、`SUPERAGENT_PORT`（默认 `0`）、
-  `SUPERAGENT_STATE_DIR`（写进 overlay，换一个独立 `stateDir`，用于排查"锁被占"）、`SUPERAGENT_USER_DATA`（强制用户数据目录）、
-  `SUPERAGENT_NODE`、`SUPERAGENT_DSH_BIN`、`SUPERAGENT_DESKTOP_ROOT`、`SUPERAGENT_CWD`、`SUPERAGENT_START_TIMEOUT_MS`（默认 90000）、
-  `SUPERAGENT_SCREENSHOT=1`（每次页面加载约 4 秒后截一张 `screenshot.png`）
-- 用户数据目录按顺序取第一个可写的：`%SUPERAGENT_USER_DATA%` → `%APPDATA%\Superagent` → `<exe 所在目录>\user-data` → `%TEMP%\superagent-user-data`
+- 应用支持的排障用环境变量（一般不用设，完整表见 `<checkout>\windows-app\README.md` §6 与 `INSTALL.md` §3）：
+  `SUPERAGENT_PROFILE`（默认 `superagent`）、`SUPERAGENT_PORT`（默认 `0`）、`SUPERAGENT_STATE_DIR`（写进 overlay，换独立 `stateDir`）、
+  `SUPERAGENT_USER_DATA`、`SUPERAGENT_HOME`（安装根目录）、`SUPERAGENT_CWD`/`SUPERAGENT_CHECKOUT`（插件 checkout）、
+  `SUPERAGENT_NODE`、`SUPERAGENT_DSH_BIN`、`SUPERAGENT_GIT_DIR`、`SUPERAGENT_GH_DIR`、`SUPERAGENT_START_TIMEOUT_MS`（默认 90000）、`SUPERAGENT_SCREENSHOT=1`
+- 应用数据（userData）按顺序取第一个可写的：`%SUPERAGENT_USER_DATA%` → **`%APPDATA%\Superagent`（默认）** → `<exe 所在目录>\user-data`（`%APPDATA%` 不可写时的兜底）→ `%TEMP%\superagent-user-data`；实际选择写在 `app.log` 开头
 - overlay 优先写到 `<userData>\runtime.patch.yml`；不可写时依次退到应用目录、系统临时目录
 
 启动后 `GET /orchestrator/api/state` 的典型待配置状态（✅ 实测，`stateDir` 用临时目录、端口用 `--patch` 换到 3099）：
@@ -928,10 +931,10 @@ node "%APPDATA%\npm\node_modules\@deepseek-ai\dsh\lib\bin.js" ^
     port: 3099
 - id: dsh-superagent
   config:
-    stateDir: <一个临时绝对路径，例如 C:/Users/Chen/AppData/Local/Temp/sa-test>
+    stateDir: C:/Users/<you>/AppData/Local/Temp/sa-test
 "@ | Set-Content -Encoding utf8 "$env:TEMP\sa-test.yml"
 
-node "%APPDATA%\npm\node_modules\@deepseek-ai\dsh\lib\bin.js" `
+node "$env:APPDATA\npm\node_modules\@deepseek-ai\dsh\lib\bin.js" `
   --profile superagent --patch "$env:TEMP\sa-test.yml" --no-open
 
 # 另开窗口：
@@ -941,7 +944,7 @@ curl.exe -s -H "x-orchestrator-request: 1" http://127.0.0.1:3099/orchestrator/ap
 
 ### 8.5 日志都在哪
 
-应用的用户数据目录（正常情况）：`%USERPROFILE%\AppData\Roaming\Superagent\`；受限令牌下退到 `<exe 所在目录>\user-data\`。
+应用的用户数据目录（默认）：`%APPDATA%\Superagent\`；`%APPDATA%` 不可写时退到 `<exe 所在目录>\user-data\`；实际选择写在 `app.log` 第一行。
 
 | 日志 | 位置 | 用途 |
 | --- | --- | --- |
@@ -1053,8 +1056,9 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | 症状 | 原因与处理 |
 | --- | --- |
 | 双击应用后一直"正在启动 Superagent…" | 90 秒后应出错误页。看 `backend.log` 最后几行；最常见是 git 不在 PATH 导致 setup 失败、或 dsh 版本不对 |
-| 应用错误页出现 `EPERM ... cordis.yml` / 无法写 `%USERPROFILE%\.dsh` | 应用运行在**受限（Low-integrity）令牌**下（例如从自动化/沙箱上下文启动），Electron 写不了你的用户目录。正常双击桌面快捷方式不受此限制；排障时可用 `DSH_HOME` 指向可写目录 + `SUPERAGENT_STATE_DIR` 指向临时状态目录（这正是应用验收时的做法，**不要**用于正式数据） |
-| 直接双击 `Superagent.exe` 后窗口一闪而过/崩溃 | 少了 `--no-sandbox --disable-gpu`。用桌面快捷方式或 `启动 Superagent.cmd`，它们已内置这两个参数 |
+| 应用错误页出现 `EPERM ... cordis.yml` / 无法写 `%USERPROFILE%\.dsh` | 应用运行在**受限（Low-integrity）令牌**下（例如从自动化/沙箱上下文启动），Electron 写不了你的用户目录。**正常从 Explorer 双击（Medium IL）预期没问题，但还没有被一次普通双击验证过**；排障时可用 `DSH_HOME` 指向可写目录 + `SUPERAGENT_STATE_DIR` 指向临时状态目录（验收时就是这么做的，**不要**用于正式数据） |
+| 直接双击 exe 后窗口一闪而过/崩溃 | 少了 `--no-sandbox --disable-gpu`。用安装器创建的桌面快捷方式，或源码目录的 `启动 Superagent.cmd`（两者都内置参数） |
+| 移动了安装目录/checkout 后打不开、或快捷方式失效 | 重跑 `<checkout>\windows-app\install.cmd -Force`：它会重写 `config\paths.json` 与两个快捷方式；不要手工改快捷方式 |
 | 启动页/面板顶部出现横幅"未找到 git (Git for Windows) / gh (GitHub CLI)" | 应用没找到 git/gh，GitHub 集成不可用。按 2.4 加进 User PATH，然后 **Ctrl+Shift+R** 重启后端 |
 | 应用错误页提示"另一个 Superagent 后端正在运行并占用同一 stateDir" | 先关掉别的实例；或设 `SUPERAGENT_STATE_DIR` 指向独立状态目录再启动（排障用，不要用于正式数据） |
 | 应用错误页提示"端口被占用 … 若你设置了 SUPERAGENT_PORT" | 把 `SUPERAGENT_PORT` 改回 `0`（应用应使用系统分配端口） |
@@ -1191,8 +1195,8 @@ Set-Location <checkout>
 & "$env:APPDATA\npm\dsh.cmd" plugin --profile superagent add "link:D:/1111/dsh-superagent"
 
 # --- 智能体账户 ---
-& '%USERPROFILE%\bin\gh-agent.cmd' auth login --hostname github.com --git-protocol https --web
-& '%USERPROFILE%\bin\gh-agent.cmd' api user --jq .login
+& "$env:USERPROFILE\bin\gh-agent.cmd" auth login --hostname github.com --git-protocol https --web
+& "$env:USERPROFILE\bin\gh-agent.cmd" api user --jq .login
 
 # --- 启停（CLI 路径）---
 .\scripts\dsh-superagent.cmd start

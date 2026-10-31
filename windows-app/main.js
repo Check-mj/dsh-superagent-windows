@@ -179,11 +179,25 @@ function whichExe(name) {
 }
 
 function resolveTool(name, candidates) {
+  /* Order matters: this installation's own tools\ must win over whatever
+   * happens to be on PATH, otherwise a self-contained bundle would silently use
+   * an unrelated machine-wide copy. Explicit overrides come first, then the
+   * bundled tools, then PATH, then the standard locations. */
+  const explicit = [];
+  const bundled = [];
+  const standard = [];
+  for (const c of candidates) {
+    const resolved = path.resolve(c);
+    if (resolved.startsWith(path.resolve(APP_ROOT) + path.sep)) bundled.push(resolved);
+    else standard.push(resolved);
+  }
+  for (const c of explicit.concat(bundled, standard)) {
+    if (isFile(path.join(c, name + '.exe'))) {
+      return { dir: c, via: bundled.includes(c) ? 'bundled tools' : 'known path' };
+    }
+  }
   const dir = whichExe(name);
   if (dir) return { dir, via: 'where ' + name };
-  for (const c of candidates) {
-    if (isFile(path.join(c, name + '.exe'))) return { dir: c, via: 'known path' };
-  }
   return null;
 }
 
