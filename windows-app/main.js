@@ -255,6 +255,30 @@ function childEnv(tools) {
       }
     } catch { /* no ssh config: keep the default */ }
   }
+  // A Windows system proxy lives in the registry, which git/libcurl and gh do not read;
+  // pass it explicitly so worker git and GitHub CLI follow the same route as the browser.
+  try {
+    const BS = String.fromCharCode(92);
+    const key = ['HKCU', 'Software', 'Microsoft', 'Windows', 'CurrentVersion', 'Internet Settings'].join(BS);
+    const read = (name) => spawnSync('reg', ['query', key, '/v', name], { encoding: 'utf8', windowsHide: true }).stdout || '';
+    const enabled = /ProxyEnable\s+REG_DWORD\s+0x1/i.test(read('ProxyEnable'));
+    const raw = (/ProxyServer\s+REG_SZ\s+(\S+)/i.exec(read('ProxyServer')) || [])[1];
+    if (enabled && raw) {
+      const parts = raw.split(';').map((s) => s.trim()).filter(Boolean);
+      const pick = (scheme) => {
+        const hit = parts.find((s) => s.toLowerCase().startsWith(scheme + '='));
+        if (hit) return hit.slice(scheme.length + 1);
+        return parts.some((s) => s.includes('=')) ? null : parts[0];
+      };
+      const https = pick('https') || pick('http');
+      if (https) {
+        env.HTTPS_PROXY = env.HTTPS_PROXY || 'http://' + https;
+        env.HTTP_PROXY = env.HTTP_PROXY || 'http://' + (pick('http') || https);
+        env.NO_PROXY = env.NO_PROXY || '127.0.0.1,localhost,::1';
+        log('[preflight] system proxy: ' + https + ' (HTTPS_PROXY passed to the backend)');
+      }
+    }
+  } catch { /* no readable proxy settings: keep the default */ }
   }
   return env;
 }

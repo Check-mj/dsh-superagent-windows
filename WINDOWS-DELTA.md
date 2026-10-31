@@ -136,3 +136,48 @@ git tag -f upstream-base upstream/main
 - 官方仓库**没有** Windows 支持；我们是唯一实现，因此未来官方若自带 Windows 分支，应评估是否整体切回官方实现（见 §5 冲突预案最后一条）。
 - 本 fork 尚未推送到远程（`origin` 待设置）。
 - `windows-app/` 的打包产物（Electron 二进制、`user-data/`、`lib/`、`node_modules/`）不入库，只入库源码与构建脚本。
+
+---
+
+## 8. 网络传输适配（中国大陆网络常见）
+
+这一类改动与上游功能无关，但**没有它智能体无法工作**：它接单后要用 `git fetch` 检出仓库。
+
+### 8.1 观测到的网络分层
+
+| 目标 | 结果 |
+|---|---|
+| `api.github.com:443` | 通常可达（`gh` 用它轮询，所以面板看起来正常） |
+| `codeload.github.com:443` | 通常可达 |
+| `github.com:443`（git 的 HTTPS 传输） | **常被阻断** |
+| `github.com:22` / `ssh.github.com:443` | 通常可达 |
+
+后果：面板能收到触发、能评估，但执行器 `git fetch` 必然失败。这是最容易误判成"插件坏了"的地方。
+
+### 8.2 SSH 传输（`SUPERAGENT_GIT_SSH=1`）
+
+`src/infra/environment.ts` 的 `writeEnvironment()` 增加一段 opt-in 的 URL 重写：
+
+```ini
+[url "ssh://git@github.com/"]
+	insteadOf = https://github.com/
+```
+
+worker 的 `git fetch https://github.com/owner/repo` 因此改走 SSH。**桌面应用会自动判断**：若 `~/.ssh/config` 中已存在 `Host github.com` 路由，就为后端设置 `SUPERAGENT_GIT_SSH=1`（日志有 `worker git transport: SSH`），否则保持 HTTPS 默认。不靠网络探测，跟随操作者已经做出的路由选择。
+
+配套（一次性、在操作者侧）：
+- 生成密钥：`ssh-keygen -t ed25519 -N "" -f %USERPROFILE%\.ssh\id_ed25519`
+- `~/.ssh/config`：`Host github.com` → `HostName ssh.github.com` / `Port 443` / `User git` / `IdentityFile`
+- 把 `id_ed25519.pub` 登记到 GitHub 账号（**这一步必须能访问 github.com**，之后不再需要代理）
+
+### 8.3 系统代理透传
+
+Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git/libcurl 与 `gh` 都不读它**——这正是"浏览器能打开 GitHub，但 `git push`/`git fetch` 超时"的原因。桌面应用在启动时读取 `ProxyEnable`/`ProxyServer`，为该后端进程设置 `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY`（日志有 `system proxy: … (HTTPS_PROXY passed to the backend)`），使 git、gh、node 与浏览器走同一条路。
+
+> 注意：仓库本地若已 `git config http.proxy`，那是**开发者手动配置**，不属于产品行为；产品侧只做环境变量透传。
+
+### 8.4 判定顺序
+
+1. `~/.ssh/config` 路由了 github → 用 SSH（不依赖代理，最稳）
+2. 否则若系统代理开启 → 透传代理给后端（HTTPS 传输）
+3. 否则直连（在无阻断网络下等价于上游默认行为）
