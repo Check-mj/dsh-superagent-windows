@@ -298,9 +298,11 @@ function backendCwd() {
   };
   // Installation-time record written by install.ps1, so the pieces may live anywhere.
   try {
-    const recorded = path.join(APP_ROOT, '..', 'config', 'paths.json');
+    const recorded = path.join(APP_ROOT, 'config', 'paths.json');
     if (isFile(recorded)) {
-      const checkout = JSON.parse(fs.readFileSync(recorded, 'utf8')).checkout;
+      // PowerShell's Set-Content writes a UTF-8 BOM; JSON.parse rejects it.
+      const raw = fs.readFileSync(recorded, 'utf8').replace(/^﻿/, '');
+      const checkout = JSON.parse(raw).checkout;
       if (checkout && isCheckout(checkout)) return checkout;
     }
   } catch { /* A malformed record falls through to the layout search below. */ }

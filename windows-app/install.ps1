@@ -62,7 +62,7 @@ $paths = [ordered]@{
   installed = (Get-Date).ToString('o')
 }
 $pathsJson = Join-Path $Root 'config\paths.json'
-$paths | ConvertTo-Json | Set-Content -LiteralPath $pathsJson -Encoding UTF8
+[System.IO.File]::WriteAllText($pathsJson, ($paths | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
 Write-Host ("recorded     : " + $pathsJson)
 
 if (-not $NoShortcuts) {
@@ -90,4 +90,4 @@ if (-not $NoShortcuts) {
 
 Write-Host ''
 Write-Host 'Done. Start it from the Desktop shortcut (Superagent).' -ForegroundColor Green
-Write-Host ('Logs: ' + (Join-Path $Root 'data\app.log'))
+Write-Host ('Logs: ' + (Join-Path $env:APPDATA 'Superagent\app.log'))
