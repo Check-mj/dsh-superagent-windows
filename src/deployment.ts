@@ -6,11 +6,13 @@ import type { Volatile } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
 import { z } from 'zod'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
-import { runAsWorker, sameDirectory, withoutDirectory, workerBin } from './infra/environment.ts'
+import { agentGhConfig, runAsWorker, sameDirectory, withoutDirectory, workerBin } from './infra/environment.ts'
 import { SetupError } from './setup.ts'
 
 const reason = (error: unknown): string => error instanceof Error ? error.message : String(error)
-const absolute = (description: string) => s.string().pattern(/^\//).description(`${description} Absolute path.`)
+// Windows absolute paths are drive-qualified (`C:/...` or `C:\...`), so the POSIX `^/` rule alone would reject every valid
+// state directory on that platform.
+const absolute = (description: string) => s.string().pattern(/^(?:[A-Za-z]:[\\/]|\/)/).description(`${description} Absolute path.`)
 /** Plugin configuration of the dsh-superagent entry. Volatile fields apply without a restart because dsh-superagent reads them on each use; changing `stateDir` remounts the plugin. */
 export const Config = s.object({
   stateDir: absolute('Directory for the database, locks, worker shims, the agent\'s git configuration and, by default, the ticket directories.').required(),
@@ -72,7 +74,15 @@ export type Probe = (argv: string[]) => Promise<string>
 /** Run startup checks through DSH's worker subprocess service with worker shims removed from PATH so a `gh` wrapper script reaches the real binary. */
 export function workerProbe(subprocess: SubprocessRuntime, stateDir: string, cwd: string, signal: AbortSignal): Probe {
   const path = withoutDirectory(process.env.PATH ?? '', workerBin(stateDir))
-  return argv => runAsWorker(subprocess, ['env', `PATH=${path}`, ...argv], cwd, AbortSignal.any([signal, AbortSignal.timeout(60_000)]))
+  const timeout = (): AbortSignal => AbortSignal.any([signal, AbortSignal.timeout(60_000)])
+  if (process.platform !== 'win32') return argv => runAsWorker(subprocess, ['env', `PATH=${path}`, ...argv], cwd, timeout())
+  // Windows has no `env` executable; supply the shim-free PATH as an explicit environment layer, which DSH merges
+  // onto its sanitised ambient environment. Windows variable names are case-insensitive, so override the key that exists.
+  const pathVariable = Object.keys(process.env).find(name => name.toUpperCase() === 'PATH') ?? 'PATH'
+  // This probe runs before `applyEnvironment`, so the agent's configuration directory must be supplied here as well;
+  // otherwise the account check would read the operator's own `gh` login.
+  const environment = { [pathVariable]: path, GH_CONFIG_DIR: agentGhConfig(stateDir) }
+  return argv => runAsWorker(subprocess, argv, cwd, timeout(), environment)
 }
 
 const GithubUser = z.object({ login: z.string().regex(/^[A-Za-z0-9-]+$/), id: z.number().int().positive() })
