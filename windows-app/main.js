@@ -241,6 +241,20 @@ function childEnv(tools) {
   // isolate the agent GitHub account.
   if (tools && tools.pathDirs.length) {
     env.PATH = tools.pathDirs.join(';') + ';' + (env.PATH || env.Path || '');
+  // Some networks drop github.com:443 while SSH stays reachable. Observe the routing
+  // decision the operator already made in ~/.ssh/config instead of probing the network,
+  // and let the plugin's worker git follow it.
+  if (!env.SUPERAGENT_GIT_SSH) {
+    try {
+      const sshConfig = path.join(require('node:os').homedir(), '.ssh', 'config');
+      if (fs.existsSync(sshConfig) && /^\s*Host\s+github\.com/im.test(fs.readFileSync(sshConfig, 'utf8'))) {
+        env.SUPERAGENT_GIT_SSH = '1';
+        log('[preflight] worker git transport: SSH (~/.ssh/config routes github.com)');
+      } else {
+        log('[preflight] worker git transport: HTTPS (default)');
+      }
+    } catch { /* no ssh config: keep the default */ }
+  }
   }
   return env;
 }

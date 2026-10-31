@@ -12,6 +12,12 @@ import { SetupError } from '../setup.ts'
 import { CliError } from './commands.ts'
 
 const MARKER = '# Written by dsh-superagent on every start; edits are lost.'
+/**
+ * Some networks drop github.com:443 while ssh.github.com:443 stays reachable, which would make every worker
+ * `git fetch` fail even though the GitHub API (api.github.com) works. Setting SUPERAGENT_GIT_SSH=1 rewrites the
+ * github.com HTTPS URLs worker git uses to SSH, so the transport can follow the network without touching accounts.
+ */
+const sshTransport = (): boolean => process.env.SUPERAGENT_GIT_SSH === '1'
 /** Markers of files written under the project's earlier names (`dsh-tag`, `dsh-go`, `dsh-freelancer`), which `dsh-superagent` owns and replaces too. */
 const LEGACY_MARKERS = ['dsh-tag', 'dsh-go', 'dsh-freelancer'].map(name => `# Written by ${name} on every start; edits are lost.`)
 /** Windows needs batch shims and drive-qualified paths; every other platform keeps the POSIX forms below. */
@@ -130,6 +136,8 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
     '[credential]', '\thelper =',
     '[credential "https://github.com"]', `\thelper = ${gitQuote(credentialHelper(github.cli))}`,
     '[url "https://github.com/"]', '\tinsteadOf = git@github.com:', '\tinsteadOf = ssh://git@github.com/',
+    // Opt-in: send the HTTPS URLs git would use over SSH instead, for networks that block github.com:443.
+    ...sshTransport() ? ['[url "ssh://git@github.com/"]', '\tinsteadOf = https://github.com/'] : [],
     // Include Git LFS filters because the operator's global gitconfig (which usually holds them) is ignored.
     '[filter "lfs"]', '\tclean = git-lfs clean -- %f', '\tsmudge = git-lfs smudge -- %f', '\tprocess = git-lfs filter-process', '\trequired = true',
   ].join('\n') + '\n')
