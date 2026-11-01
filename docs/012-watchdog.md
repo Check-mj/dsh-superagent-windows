@@ -1,0 +1,56 @@
+# 012 Watchdog：官方设计的第五个模块
+
+> 依据：官方《Super-agent 设计探索》§6。这也是原型（与我们的 fork）此前**完全缺失**的一块。
+
+## 1. 为什么主系统管不了自己
+
+文章说得很直接：长期在线的分布式系统很难靠主系统内部逻辑保证可靠，需要在主系统**之外**引入独立的控制回路（Control Loop）。而且对 Agent 系统来说，传统的"进程存活探测/监控脚本"不够——很多异常不是进程崩了，而是**模型陷入无效循环或偏离目标**，从系统内部看，一个"空转的 Worker"和一个"忙碌的 Worker"长得一模一样。
+
+所以 Watchdog 要同时管两件事：
+
+| 关注点 | 谁来判断 | 例子 |
+|---|---|---|
+| 基础设施 | 确定性代码即可 | 某个 part 进 `error`、队列排不出去、接口报错 |
+| 任务进展 | **必须由模型判断** | Worker 在跑但长时间没有实质推进；方向偏离了原始请求 |
+
+## 2. 我们的实现
+
+| 设计要点（文章） | 本实现 | 位置 |
+|---|---|---|
+| 主系统**之外**的独立 Control Loop Session | 独立 Session `watchdog-<stateDir key>`，不是 Router，不收 Trigger、不接工单、不回复人 | `src/app/runtime.ts` `startWatchdog()` |
+| 由**定时消息**驱动 | `setInterval` 每 `watchdogMinutes` 分钟投一条 digest（`prompt(..., 'queue')`），`unref()` 不拖住进程 | `WatchdogLoop` in `src/app/watchdog.ts` |
+| 具备**完整工具能力** | Session 用 bundle 的 `dsh-superagent-worker` preset（fs/shell/jobs 全量），不带任何工具限制 | 复用 `Sessions.ensure(..., 'worker')` |
+| 能在自然语言下**修正系统行为** | digest 里给出本地管理 API 与必需 header，Watchdog 用 shell + curl 调 `POST tickets/<id>/retry|stop`、`POST executor/pause`、`PUT settings/...` | digest 文本 |
+| 只管"值不值得介入" | 明确的静默规则：健康时不报告、不总结、"all clear" 一律不发 | digest 末段 |
+
+配置项（`Machine`）：
+
+```yaml
+- id: dsh-superagent
+  config:
+    stateDir: C:/Users/<you>/.dsh/state/superagent
+    watchdogMinutes: 30   # 0 关闭；默认 30
+```
+
+## 3. Digest 写了什么
+
+`watchdogDigest(snapshot, interval)` 是一段确定性文本，四段结构：
+
+1. **身份**：你是外部控制回路，不是 Router——不接活、不回复人、不改工单。
+2. **现状**：执行器负载、每个未关工单的 Assignment 状态与"安静了多久"、所有非 ready 的 part 及其 detail。
+3. **判断顺序**：① 基础设施故障是偶发还是配置问题（配置问题只报告，不绕过）；② 工单是否"在跑但没进展"（读它的 Session，决定 retry 还是 stop）；③ 是否偏离原始请求（说明，由人决定）。
+4. **行动方式与静默规则**：管理 API + header；健康时保持安静；已报告过的不重复。
+
+它是**纯函数**（`WatchdogSnapshot` → string），因此可以在测试里逐字断言——这就是 `tests/watchdog.spec.ts` 做的事。
+
+## 4. 与其它模块的边界（重要）
+
+- **不替代 Router**：Watchdog 不参与路由、不分配工单、不代表系统对外说话。
+- **不替代 §8.4 的凭据隔离**：它读的是 digest 与本地 API，不接触凭据。
+- **不保证存算分离**：进程整体离线时 Watchdog 也会停（§5 未实现），这类故障仍需外部监督；我们的 `scripts/dsh-superagent status` + 操作系统计划任务可作为更外层的一层。
+
+## 5. 已知限制与后续
+
+1. 目前只有"投 digest"，没有把 Ticket 的 Session 内容自动摘要进 digest（模型需自己读）；后续可把最近几轮的关键事件 Inline 进 digest（与 §3.3 一致）。
+2. 间隔是静态配置；没有按负载自适应（文章也未要求）。
+3. 尚未在 Windows 上做"进程级"守护（Watchdog 与被守护进程同一进程）；跨进程守护由外部计划任务承担，见 `WINDOWS-SETUP.md` 的每小时巡检。

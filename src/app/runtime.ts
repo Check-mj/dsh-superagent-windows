@@ -19,6 +19,7 @@ import { SourceRegistry } from '../sources/registry.ts'
 import { Commands } from '../infra/commands.ts'
 import type { Deployment, Machine } from '../deployment.ts'
 import { environmentOf, ticketEnvironment, type Variable } from './execution-environment.ts'
+import { WatchdogLoop, assignmentStates, quietMinutes, watchdogDigest, watchdogProblems } from './watchdog.ts'
 import type { SetupProblem } from '../setup.ts'
 import { DshExecutor, sourceTrigger, triggerMessage, workerSessionId } from '../executor/dsh.ts'
 import { ticketCard } from './cards.ts'
@@ -82,6 +83,9 @@ export class Runtime extends Service implements SourceHost {
   private releaseLock?: () => Promise<void>
   private closingFlag = false
   private stopping?: Promise<void>
+  /** The Watchdog Session, which the external control loop prompts on a schedule. */
+  readonly watchdogId!: string
+  private watchdog?: WatchdogLoop
   private readonly sourceDeps: SourceContextDeps
   private readonly toolHost: MainToolsHost & ExecutorToolsHost
   /** Non-zero while a main-Session tool is executing an Engine command, suppressing self-triggered domain event notices. */
@@ -105,6 +109,8 @@ export class Runtime extends Service implements SourceHost {
       const feishu = () => setup.configured() && !!setup.deployment.feishu
       const prompts = this.prompts = new Prompts(store, () => machine.promptMaxChars.get(), deployed, feishu)
       const masterId = this.masterId = store.get(KV.runtime.masterId) ?? `orchestrator-${key(machine.stateDir)}`
+      // A Session of its own, outside the Router: the external control loop of the official design (article §6).
+      this.watchdogId = `watchdog-${key(machine.stateDir)}`
       store.set(KV.runtime.masterId, masterId)
       const commands = this.commands = new Commands(() => setup.deployment, setup.commandEnvironment, this.lifetime)
       const board = this.board
@@ -223,6 +229,7 @@ export class Runtime extends Service implements SourceHost {
     if (this.closing()) return
     this.executor.resume()
     this.passes.start()
+    await this.startWatchdog()
     this.effects.start()
     this.runtimeHealth.set({ state: 'ready', detail: 'Orchestrator is ready', at: now() })
   }
@@ -250,6 +257,52 @@ export class Runtime extends Service implements SourceHost {
       this.setup.restart()
     }
   }
+  /**
+   * Ensure the Watchdog Session and start its loop. It is deliberately outside the Router: it receives no Triggers,
+   * takes no work, and cannot answer people — it only observes and intervenes.
+   */
+  private async startWatchdog(): Promise<void> {
+    const minutes = this.machine.watchdogMinutes.get()
+    if (minutes <= 0) return
+    try {
+      await this.sessions.ensure(this.watchdogId, this.machine.stateDir, 'dsh-superagent watchdog', 'worker')
+    } catch (error) {
+      this.ctx.logger.warn('dsh-superagent could not create its watchdog Session: %s', String(error))
+      return
+    }
+    const loop = new WatchdogLoop({
+      everyMinutes: () => this.machine.watchdogMinutes.get(),
+      digest: () => watchdogDigest(this.watchdogSnapshot(), this.machine.watchdogMinutes.get()),
+      deliver: async text => {
+        const settings = this.store.settings()
+        await this.sessions.prompt(this.watchdogId, `watchdog-${Date.now()}`, text, 'queue', undefined,
+          () => { void settings })
+      },
+      log: message => this.ctx.logger.warn('dsh-superagent: %s', message),
+    })
+    this.watchdog = loop
+    loop.start()
+    this.ctx.logger.info('dsh-superagent watchdog: every %d min', minutes)
+  }
+  /** What the system believes is happening, as the digest words it. */
+  private watchdogSnapshot() {
+    const now = Date.now()
+    const tickets = this.store.tickets.open().map(ticket => ({
+      id: ticket.id,
+      title: ticket.title,
+      states: assignmentStates(ticket),
+      quietMinutes: quietMinutes(ticket.updatedAt, now),
+    }))
+    return {
+      tickets,
+      running: tickets.reduce((sum, ticket) => sum + ticket.states.filter(state => state === 'running').length, 0),
+      queued: this.store.tickets.open().length,
+      maxWorkers: this.store.settings().executor.maxWorkers,
+      problems: watchdogProblems(this.board.all),
+      apiBase: `http://127.0.0.1:${process.env.DSH_SUPERAGENT_WATCHDOG_API_PORT ?? 3082}/orchestrator/api`,
+      paused: this.store.settings().paused,
+    }
+  }
   private httpHost(): HttpHost {
     const runtime = this
     const { store, sources, prompts, sessions, settings, engine, executor, health, machine, masterId, ready, sourceLinks, setup, passes } = this
@@ -270,6 +323,7 @@ export class Runtime extends Service implements SourceHost {
       for (const agent of agents) agent.cancel({ kind: 'user' }, { keepInbox: true })
       await Promise.allSettled([passes, this.effects.drain(), ...agents.map(agent => agent.whenIdle())])
       // The workers' jobs and subagents stop too: their ends would start worker turns without the tool limits released below.
+      this.watchdog?.stop()
       await this.executor.shutdown()
       this.executor.dispose()
       this.sessions.dispose()
