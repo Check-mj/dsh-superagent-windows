@@ -22,9 +22,19 @@
 
 ## 3. 实施顺序与验收
 
-### P1 · 异步子任务（§4.1 缺失的右半边）— 下一轮
+### P1 · 异步子任务（§4.1 缺失的右半边）— 核心已实现，工具暴露待接线
 
-**前置已确认**：`ctx.on('agent/status')` 与 `agent/disposed` 可用于判定子任务结束，因此不依赖上游即可实现。
+**已完成**：`src/app/subagents.ts` 的生命周期层（无 DSH/插件依赖，全部注入）——
+`start()` 立即返回带 id 的 record（Started 语义）、子任务在独立 Session 运行、
+`finish()` 把结果作为**一条事件消息**投回父 Session 且**只投一次**、
+`cancel()` 之后不再投递、超长结果按 §3.3 **Spill**（保留续读提示）、完成的 record 按保留期回收。
+5 个用例覆盖上述行为（`tests/subagents.spec.ts`）。
+
+**未完成（下一轮）**：1）把它接成 opt-in 工具 `subagent_background` / `subagent_cancel` 并写进 preset 的允许名单；
+2）用 `ctx.on('agent/status')` 的 idle 事件驱动 `finish()`，`agent/disposed` 驱动回收；
+3）真实并发验收（慢子任务运行期间父 Session 仍能响应新消息）。**在接线完成前该能力不对外暴露，未开启时行为零变化。**
+
+**前置已确认**：`ctx.on('agent/status')` 与 `agent/disposed` 可用，因此判定子任务结束不依赖上游。
 
 **做法**（不改上游）：在 bundle 里新增一个插件自带的工具（形如 `subagent_background`），worker/router preset 里可选用。行为：
 
