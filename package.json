@@ -4,7 +4,7 @@
   "license": "MIT",
   "version": "0.1.0",
   "private": true,
-  "description": "A proactive agent for one GitHub repository, as a DSH (DeepSeek Harness) bundle: it listens to GitHub and optionally Feishu, evaluates requests under a Policy, turns authorized ones into Tickets, and executes each in its own DSH Session.",
+  "description": "\u76d1\u542c\u5355\u4e2a GitHub \u4ed3\u5e93\uff0c\u628a\u83b7\u6388\u6743\u7684\u8bf7\u6c42\u8f6c\u4e3a\u5de5\u5355\u5e76\u5728\u5404\u81ea\u7684 DSH \u4f1a\u8bdd\u4e2d\u6267\u884c\u3002A proactive agent for one GitHub repository, packaged as a DSH bundle.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -121,5 +121,20 @@
     "react-dom": "18.3.1",
     "@types/react-dom": "18.3.7",
     "@deepseek-ai/dsh-subprocess": "0.2.1-alpha.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/dsh-superagent-prototype.git"
+  },
+  "homepage": "https://github.com/Check-mj/dsh-superagent-windows",
+  "bugs": {
+    "url": "https://github.com/Check-mj/dsh-superagent-windows/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "super-agent",
+    "github",
+    "windows"
+  ]
 }

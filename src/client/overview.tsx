@@ -99,5 +99,18 @@ export function OverviewPage() {
         {stat(t('idleLabel'), data.executor.idle)}
       </div>}
     </Section>
+    <Section title={t('aboutTitle')}>
+      <Hint>{t('aboutIntro')}</Hint>
+      <ul className="dt-list">
+        <li className="dt-row"><div className="dt-row-main"><div className="dt-att-what">{t('aboutUpstream')}</div>
+          <p className="dt-row-meta"><a href="https://github.com/deepseek-ai/dsh-superagent-prototype" target="_blank" rel="noreferrer noopener">github.com/deepseek-ai/dsh-superagent-prototype</a></p></div></li>
+        <li className="dt-row"><div className="dt-row-main"><div className="dt-att-what">{t('aboutBuild')}</div>
+          <p className="dt-row-meta"><a href="https://github.com/Check-mj/dsh-superagent-windows" target="_blank" rel="noreferrer noopener">github.com/Check-mj/dsh-superagent-windows</a></p></div></li>
+        <li className="dt-row"><div className="dt-row-main"><div className="dt-att-what">{t('aboutDelta')}</div>
+          <p className="dt-row-meta"><a href="https://github.com/Check-mj/dsh-superagent-windows/blob/main/WINDOWS-DELTA.md" target="_blank" rel="noreferrer noopener">WINDOWS-DELTA.md</a></p></div></li>
+        <li className="dt-row"><div className="dt-row-main"><div className="dt-att-what">{t('aboutIssues')}</div>
+          <p className="dt-row-meta"><a href="https://github.com/Check-mj/dsh-superagent-windows/issues" target="_blank" rel="noreferrer noopener">github.com/Check-mj/dsh-superagent-windows/issues</a></p></div></li>
+      </ul>
+    </Section>
   </>
 }
