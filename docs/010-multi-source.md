@@ -17,6 +17,7 @@
 |---|---|---|
 | `src/sources/registry.ts:43` `kind(id)` | 把 settings 的 key **当作 kind** 查表（key `github` → kind `github`） | 第二个 GitHub Source（如 `acme-widgets`）无法映射到 kind，也就注册不了 |
 | `src/app/setup.ts`（`setup.deployment`） | 全局解析**一个** `Deployment`（repository + gh login + noreply） | 一个进程只能服务一个仓库、一个账号 |
+| `src/app/runtime.ts:164`、`src/github-watch.ts` 等入口插件 | Source 按 **kind** 挂载：每个 kind 一个 `SourceContext`、一组健康条目（`health: ['github']`） | 第二个实例没有自己的上下文与健康条目，会和第一个共用，导致健康互相覆盖、命令作用域错乱 |
 | `src/infra/environment.ts` `agentVariables()` | `GH_CONFIG_DIR` 是 **stateDir 级**常量，worker 环境全局共用 | 多个账号必须各自有 `gh` 配置目录，否则全都用同一个账号 |
 
 其余部分**已经按 Source 作用域设计**，这是方案可行的基础：
@@ -112,7 +113,7 @@
 
 | 阶段 | 内容 | 验收标准 |
 |---|---|---|
-| **P1 核心** | 1–7：schema、registry、per-instance setup/deployment、per-instance worker 账号、per-instance 健康 | 两个 GitHub 实例各自 `setup.problem: null`；各自的信号触发只进自己的工单；A 实例账号失效时 B 仍 `ready` |
+| **P1 核心** | 1–7：schema、registry、per-instance setup/deployment、**入口插件按实例挂载 + 逐实例健康名**、per-instance worker 账号 | 两个 GitHub 实例各自 `setup.problem: null`；各自的信号触发只进自己的工单；A 实例账号失效时 B 仍 `ready` |
 | **P2 面板** | 8：Sources 页多实例 CRUD | 面板可新增/删除/启停实例；删除实例不影响其它实例的工单与健康 |
 | **P3 收尾** | 9–10 + 文档 | `status` 逐实例报告；`WINDOWS-SETUP.md` 增加多仓章节；契约测试覆盖实例隔离 |
 
@@ -132,3 +133,21 @@
 1. **实例失败语义**：一个实例的账号失效，服务应继续为其它实例工作（推荐），还是整体停机？
 2. **账号复用**：是否允许两个实例共用同一个 `gh` 账号（同一 `GH_CONFIG_DIR`）？推荐允许（只读场景常见），但要在面板上提示。
 3. **面板优先级**：P1 完成后是立刻做面板（P2），还是先做可观测性（原第 3 项）？
+
+---
+
+## 10. 实施复盘：挂载层才是真正的边界（2026-11-01）
+
+按第 5 节开始实施后发现的修正，记录在此以免下一轮再低估：
+
+- 第 5 节第 3 行（`setup`）不是最大的一块；**真正的结构边界在挂载层**。Source 由独立 cordis 入口插件（`dsh-superagent/github-watch`）按 kind 挂载，`Runtime.context(kind)` 每次只给一个 kind 建一个上下文，健康条目也是 kind 级的（`health: ['github']`）。
+- 因此「两个仓库」必须让**入口插件按实例迭代**，每个实例拿到自己的 `SourceContext`、`Commands`（仓库作用域）与健康条目名（`github:<id>`）。
+- 只改 `setup` 而不改挂载层是最坏情况：两个实例共用一套上下文，会**用同一组账号/仓库作用域去处理两个仓库**，产出错仓库的 PR——比现在明确拒绝危险得多。所以 C1 的拒绝是必要的中间态。
+
+修订后的 C2 工作顺序（一次提交完成）：
+
+1. `Setup.deployments: Map<实例, Deployment>` + `deploymentFor(id)` + 逐实例 `problems`
+2. 入口插件按 `SourceRegistry.instances()` 迭代挂载，健康条目名带实例后缀
+3. `Commands` / `links` / `pullEndNotices` / `ticketEnvironment` 全部按工单或实例的 source 取 deployment
+4. 先放行「同账号多仓库」；不同账号留到 C3（`GH_CONFIG_DIR` 按实例）
+5. 验收：两仓库各自 `setup: null`、触发互不串、A 账号失效时 B 仍 `ready`
