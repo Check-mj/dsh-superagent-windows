@@ -1088,7 +1088,8 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | --- | --- |
 | 双击应用后一直"正在启动 Superagent…" | 90 秒后应出错误页。看 `backend.log` 最后几行；最常见是 git 不在 PATH 导致 setup 失败、或 dsh 版本不对 |
 | 应用错误页出现 `EPERM ... cordis.yml` / 无法写 `%USERPROFILE%\.dsh` | 应用运行在**受限（Low-integrity）令牌**下（例如从自动化/沙箱上下文启动），Electron 写不了你的用户目录。**正常从 Explorer 双击（Medium IL）预期没问题，但还没有被一次普通双击验证过**；排障时可用 `DSH_HOME` 指向可写目录 + `SUPERAGENT_STATE_DIR` 指向临时状态目录（验收时就是这么做的，**不要**用于正式数据） |
-| 直接双击 exe 后窗口一闪而过/崩溃 | 少了 `--no-sandbox --disable-gpu`。用安装器创建的桌面快捷方式，或源码目录的 `启动 Superagent.cmd`（两者都内置参数） |
+| 直接双击 exe 后窗口一闪而过/崩溃 | 少了 `--no-sandbox --disable-gpu`。用安装器创建的桌面快捷方式，或源码目录的 `启动 DSH-Superagent.cmd`（两者都内置参数） |
+| 从某个终端/IDE 里启动后**什么都没发生**：没有窗口、`app.log` 也没有新增行 | 该终端设置了 `ELECTRON_RUN_AS_NODE=1`（Electron 系编辑器/自动化终端常见），被 `Superagent.exe` 继承后它退化成普通 Node 进程，读不到 app 就以退出码 0 结束——看起来像"双击没反应"。先在新终端里 `$env:ELECTRON_RUN_AS_NODE` 确认，再 `set "ELECTRON_RUN_AS_NODE="`（PowerShell：`Remove-Item Env:ELECTRON_RUN_AS_NODE`）后启动；或直接双击桌面快捷方式（不继承那个变量）。源码目录的 `启动 DSH-Superagent.cmd` 已内置清除 |
 | 移动了安装目录/checkout 后打不开、或快捷方式失效 | 重跑 `<checkout>\windows-app\install.cmd -Force`：它会重写 `config\paths.json` 与两个快捷方式；不要手工改快捷方式 |
 | 后端 cwd 落在 `%USERPROFILE%\.dsh\profiles\superagent` 而不是 `<checkout>` | 旧版应用的 bug：安装记录被从 `APP_ROOT\..\config\paths.json` 读取（正确是 `<root>\config\paths.json`），于是静默回退到 profile 目录。更新应用并 `install.cmd -Force` 后重启；临时可用 `SUPERAGENT_CWD=<checkout>` 绕过 |
 | 安装记录不生效 / 改了 `config\paths.json` 没反应 | `paths.json` 若带 **BOM**，`JSON.parse` 会失败并（旧版）被静默忽略。安装器已改为无 BOM 写入、读取端剥 BOM；手工编辑请用**无 BOM 的 UTF-8**，改完重启应用 |

@@ -14,6 +14,10 @@ rem    SUPERAGENT_STATE_DIR   override the plugin stateDir (testing)
 rem    SUPERAGENT_USER_DATA   override the app data directory
 rem ==========================================================================
 setlocal
+rem Some Electron-based terminals/IDEs export ELECTRON_RUN_AS_NODE=1. Inherited by
+rem Superagent.exe that turns the GUI into a plain Node process, which exits silently
+rem (looks like "double-click does nothing"). Clear it before launching.
+set "ELECTRON_RUN_AS_NODE="
 set "APP=%~dp0Superagent.exe"
 if exist "%APP%" goto :run
 set "APP=%~dp0Superagent\Superagent.exe"
