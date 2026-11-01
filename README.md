@@ -1,3 +1,14 @@
+> **这是官方项目的 Windows 适配版（非官方产品，版权归原作者）。**
+> Upstream: [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) · MIT · Copyright (c) 2026 DeepSeek Harness Team
+>
+> 本仓库 fork 自上面这个官方原型，目标是让它在 Windows 上能**双击即用**：桌面应用、打包工具链、多实例、安装器，
+> 并补齐官方文章里上游尚未实现的部分（Watchdog 控制回路、Router 分片）。
+> 上游代码与设计版权归 DeepSeek Harness Team；本仓库新增部分同样以 MIT 发布。与上游的差异逐条记录在
+> [WINDOWS-DELTA.md](WINDOWS-DELTA.md)，上游更新可合并。
+>
+> **This repository is the Windows adaptation of the official project above, not an official DeepSeek product.**
+> The upstream code and design are MIT-licensed by the DeepSeek Harness Team; the additions here are MIT as well.
+
 # dsh-superagent
 
 > **Research prototype for reference only, not an official DeepSeek product.** This code grew out of our team's day-to-day development work, with much of the engineering done by coding agents. Treat it as research code, not production-ready software. It may still contain bugs, and its coding style and engineering practices may be inconsistent. Review and adapt it before using it in your own environment.

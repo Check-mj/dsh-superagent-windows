@@ -1,5 +1,5 @@
 node_modules/
-lib/
+# lib/ is committed: a git install of this bundle needs the built artifacts.
 .artifacts/
 .env
 coverage/

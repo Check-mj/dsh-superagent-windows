@@ -1,0 +1,31 @@
+dsh-superagent — Windows adaptation
+====================================
+
+This repository is a fork of, and adaptation built on, the official DeepSeek project:
+
+    dsh-superagent-prototype
+    https://github.com/deepseek-ai/dsh-superagent-prototype
+    Copyright (c) 2026 DeepSeek Harness Team
+    Licensed under the MIT License (see LICENSE)
+
+The upstream project is a research prototype, published with the disclaimer quoted in README.md:
+it is not an official DeepSeek product, and the design discussed in the article
+"Exploring Super-agent Design: Towards a More Autonomous Agent System" is partly future work.
+
+What this repository adds on top of upstream (all MIT, all opt-in or documented):
+
+  * a native Windows desktop application (Electron shell, portable layout, bundled git/gh/pwsh,
+    installer and shortcuts), under windows-app/
+  * multi-instance support: one context boundary per instance, separate state directories,
+    per-instance credentials and a management window
+  * the external control loop ("Watchdog") deepened beyond upstream: cross-tick diffing, stall
+    detection, silence when nothing changed, and a standing instruction channel
+  * Router sharding (article §2.1), off by default: stable Thread placement, shard Sessions created
+    on first delivery, visible in health
+  * documentation for both the Windows port and the conformance review (docs/011–docs/018)
+
+Upstream files keep their copyright and MIT license. Where this fork changes upstream behaviour it
+is listed in WINDOWS-DELTA.md; when upstream implements the same mechanism, this fork deletes its
+own version and returns to the upstream implementation.
+
+Maintainer of the Windows adaptation: Check-mj (https://github.com/Check-mj)
