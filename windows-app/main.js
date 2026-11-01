@@ -785,7 +785,8 @@ function startBackend() {
     state.url = url;
     state.ready = true;
     clearTimeout(state.timer);
-    log('[ready] backend URL: ' + url + ' (' + (Date.now() - state.startedAt) + 'ms)');
+    // The URL carries the panel token; log its origin only.
+    log('[ready] backend URL: ' + url.replace(/\?.*$/, '') + ' (' + (Date.now() - state.startedAt) + 'ms)');
     startHealthWatch();
     if (state.win && !state.win.isDestroyed()) {
       state.win.loadURL(url).catch((e) => log('[ready] loadURL failed: ' + e.message));
@@ -1262,6 +1263,10 @@ if (!gotLock) {
     }
   });
 
+  // A rejected promise anywhere in the shell is a bug, but it must not take the window down silently.
+  process.on('unhandledRejection', (reason) => {
+    log('[app] unhandledRejection: ' + (reason && reason.stack ? reason.stack : String(reason)));
+  });
   process.on('uncaughtException', (err) => {
     log('[app] uncaughtException: ' + (err && err.stack || err));
     try {

@@ -55,11 +55,20 @@ if (Get-Process -Name Superagent -ErrorAction SilentlyContinue) {
   exit 2
 }
 Write-Host 'Copying the application...'
-$copyArgs = @($appSource, $Root, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:2', '/W:2')
-if ($Force) { $copyArgs += '/IS' }
-$rc = Start-Process -FilePath 'robocopy.exe' -ArgumentList $copyArgs -Wait -PassThru -NoNewWindow
+# Call robocopy through the call operator: PowerShell then quotes paths that contain spaces, which -ArgumentList
+# would not do (a user name such as "John Doe" is enough to break the copy).
+$copySwitches = @('/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:2', '/W:2')
+if ($Force) { $copySwitches += '/IS' }
+& robocopy.exe $appSource $Root @copySwitches | Out-Null
+$rc = $LASTEXITCODE
 # robocopy: 0-7 are success codes, 8+ are failures.
-if ($rc.ExitCode -ge 8) { throw ("robocopy failed with exit code " + $rc.ExitCode) }
+if ($rc -ge 8) { throw ("robocopy failed with exit code " + $rc) }
+
+# Never report success for a copy that did not produce the executable.
+$installedExe = Join-Path $Root 'Superagent.exe'
+if (-not (Test-Path -LiteralPath $installedExe)) {
+  throw ("The copy finished but " + $installedExe + " is missing; nothing was installed.")
+}
 
 $paths = [ordered]@{
   checkout  = $checkout

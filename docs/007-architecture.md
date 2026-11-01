@@ -459,6 +459,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/class-docs.spec.ts` | Every class in `src` has a JSDoc block before it |
 | `tests/docs.spec.ts` | Numbered documents link only to earlier ones, every local link resolves, no document has merge conflict markers, and this document's tables list every module and every test |
 | `tests/portability.spec.ts` | Portability: no tracked text file names the development machine (absolute path, user name or checkout name) |
+| `tests/release-invariants.spec.ts` | Release invariants: upstream attribution in README/NOTICE/LICENSE/locale/package metadata, the changelog, the package id and the absence of credential shapes |
 
 `tests/fixtures/` holds what several tests share: `host.ts`, a simulated DeepSeek Harness host; `panel-server.ts` and `panel.tsx`, the fake management API and the panel around a page; `deployment.ts`, a resolved deployment; `git.ts`, the environment of every git the tests start, which names no repository; and `async.ts`.
 

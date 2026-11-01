@@ -27,7 +27,7 @@ $repo = 'Check-mj/dsh-superagent-windows'
 $asset = "DSH-Superagent-$Version-win-x64.zip"
 $base = "https://github.com/$repo/releases/download/v$Version"
 # SHA-256 of every published asset; an unknown version is downloaded but reported as unverified.
-$checksums = @{ '0.1.0' = 'fe96e45d558e517260ceae154b8760e80039e6a1e86553cdf7fcfe6847b91ed8' }
+$checksums = @{ '0.1.0' = 'c32713d1efb29810baacb9856086a4dd7837693b58c4e54674c458df54891dfe' }
 
 function Write-Step([string]$text) { Write-Host $text -ForegroundColor Cyan }
 function Write-Warn([string]$text) { Write-Host $text -ForegroundColor Yellow }
