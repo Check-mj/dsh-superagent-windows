@@ -9,6 +9,7 @@
 - [ ] `pnpm vitest run` 全绿（当前基线 1179 passed / 48 skipped / 0 failed）
 - [ ] 文档契约测试通过：`pnpm vitest run tests/docs.spec.ts`（编号连续、只链更早编号、本地链接可解析）
 - [ ] 工作区干净：`git status --short` 为空；`main` 与 `origin/main` 一致
+- [ ] **无本机绑定**：`pnpm vitest run tests/portability.spec.ts` 通过（全仓不得出现开发机绝对路径、用户名或旧 checkout 名）
 
 ## B. 归属与许可（不可移除）
 
