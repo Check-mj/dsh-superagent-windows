@@ -733,7 +733,7 @@ const TEXT = {
   'aboutOpenGuide': ['查看完整介绍与使用步骤', 'Open the full guide and first steps'],
   'aboutWhatTitle': ['这个面板是什么', 'What this panel is'],
   'aboutWhat': ['它是一台持续在线的开发助手：监听一个 GitHub 仓库，把你或同事的请求变成工单，在各自的会话里执行并把结果回报到原处。你不需要逐个开对话、逐个盯进度，这里就是它的控制台。', 'This is an always-on development assistant: it watches one GitHub repository, turns requests from you or your teammates into Tickets, executes each in its own Session and reports back where the request came from. You do not open conversations one by one — this panel is its console.'],
-  'aboutFlow': ['一条请求会依次经过：来源轮询 → 触发过滤 → 语义评估 → 建单执行 → 结果回贴。下面五页分别对应这五个环节。', 'A request travels: source polling → trigger filtering → semantic evaluation → ticket execution → reply on the original thread. The five pages below map to those stages.'],
+  'aboutFlow': ['一条请求会依次经过：来源轮询 → 触发过滤 → 语义评估 → 建单执行 → 结果回贴。来源、触发、评估、执行四页对应这四个环节；设置页是全部可调项。', 'A request travels: source polling → trigger filtering → semantic evaluation → ticket execution → reply on the original thread. The Source, Trigger, Eval and Execution pages map to those stages; Settings holds every adjustable option.'],
   'aboutPagesTitle': ['各页面在做什么', 'What each page does'],
   'aboutPageSource': ['看当前监听的仓库、账号与轮询状态；任何来源异常（读不到仓库、账号掉线）都会在这里显示。', 'The watched repository, accounts and polling state; any source problem (unreadable repository, signed-out account) shows up here.'],
   'aboutPageTrigger': ['按线程看环境事件流：哪些被过滤、哪些进入评估、哪些被忽略以及原因。', 'The event stream by Thread: what was filtered, what reached evaluation, what was ignored and why.'],
