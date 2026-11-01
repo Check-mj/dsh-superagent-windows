@@ -132,7 +132,7 @@ Each profile stores logs and control files under `.artifacts/`:
 - Startup logs: `dsh-superagent-<profile>-<date>-<time>-<pid>.log`, where the pid belongs to the script. The newest 20 are kept.
 - Control files: `control/profiles/<profile>/`, containing the stop marker, lock and process id.
 
-Open the URL printed in the log, then choose **Superagent** in the sidebar.
+Open the URL printed in the log, then choose **DSH-Superagent** in the sidebar.
 
 ### Hourly check
 

@@ -1,9 +1,9 @@
-# Superagent Desktop
+# DSH-Superagent Desktop
 
 A real, portable Windows desktop application (Electron) that wraps the
 **DeepSeek Harness `superagent` profile**. Double-click → the app starts the
 backend itself, waits for its token URL, and shows the DSH panel in a native
-window titled **Superagent**. Closing the window stops the backend.
+window titled **DSH-Superagent**. Closing the window stops the backend.
 
 No browser tab, no installer, no admin rights.
 
@@ -13,7 +13,7 @@ No browser tab, no installer, no admin rights.
 
 | Artifact | Path |
 | --- | --- |
-| **Desktop shortcut** (primary) | `%USERPROFILE%\Desktop\Superagent.lnk` |
+| **Desktop shortcut** (primary) | `%USERPROFILE%\Desktop\DSH-Superagent.lnk` |
 | Start Menu shortcut | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Superagent\Superagent.lnk` |
 | Portable launcher (`.cmd`, fallback) | `D:\1111\superagent-app\启动 Superagent.cmd` |
 | Portable executable | `D:\1111\superagent-app\Superagent\Superagent.exe` |
@@ -29,7 +29,7 @@ with working directory `D:\1111\superagent-app\Superagent`.
 `--no-sandbox` / `--disable-gpu` are required on this machine: without them
 Chromium crashes during startup before any JavaScript runs (observed here with
 Electron 33.4.11 and 44.7.0, signed and unsigned binaries). They are baked into
-the shortcuts and into `启动 Superagent.cmd`, and `main.js` additionally calls
+the shortcuts and into `启动 DSH-Superagent.cmd`, and `main.js` additionally calls
 `app.disableHardwareAcceleration()` / `appendSwitch('disable-gpu')` for
 defence in depth.
 

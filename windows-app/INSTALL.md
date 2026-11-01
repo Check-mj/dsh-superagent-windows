@@ -11,7 +11,7 @@ irm https://raw.githubusercontent.com/Check-mj/dsh-superagent-windows/main/insta
 
 # 安装布局与路径规则
 
-本文件定义 **Superagent 的路径方案**。所有路径在运行时推导，源码里没有任何一台机器、一个用户名的绝对路径。
+本文件定义 **DSH-Superagent 的路径方案**。所有路径在运行时推导，源码里没有任何一台机器、一个用户名的绝对路径。
 
 ---
 
