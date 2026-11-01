@@ -5,6 +5,7 @@ export type SetupPlace = 'deployment' | 'github' | 'feishu'
 export const SETUP_PROBLEMS = {
   foreignFile: ['deployment', '{file} was not written by dsh-superagent; move it, or choose another state directory.'],
   gitTooOld: ['deployment', 'git does not read the github.com credential configuration dsh-superagent writes; dsh-superagent needs git 2.32 or later.'],
+  multipleSourcesUnsupported: ['deployment', 'This build serves one GitHub Source, but these were configured: {sources}. Keep one until per-instance deployment is available (docs/010-multi-source.md).'],
   environmentFailed: ['deployment', 'Preparing the agent environment failed.'],
   repositoryUnset: ['github', 'The GitHub Source names no repository.'],
   agentCliUnset: ['github', 'The agent GitHub CLI is not set.'],

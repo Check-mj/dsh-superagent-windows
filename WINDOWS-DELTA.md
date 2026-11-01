@@ -201,3 +201,17 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 // 目标程序拿到的是 \"…\" 而不是 "…"（实测失败）
 ['cmd.exe', '/d', '/s', '/c', argv.map(quote).join(' ')]
 ```
+
+---
+
+## 9. 框架层增量（与 Windows 无关）
+
+除了平台适配，本 fork 还包含两处**框架层**扩展。它们同样遵循「新增文件 + 最小侵入」的原则，上游更新时按 §3 的方式合并。
+
+| 增量 | 位置 | 上游行为 | 我们的做法 | 状态 |
+|---|---|---|---|---|
+| 声明式配置 | `src/app/config-file.ts`、`deployment.ts` 的 `configPath` | 配置只在面板/`orchestrator.sqlite` | 新增 `configPath` 指向 JSON；启动时按块覆盖已存设置，未声明的块保持不变，格式错误 fail-open | ✅ 已实施，`docs/009` |
+| Source 实例命名 kind | `policy.ts` 的 `SourceInstanceSchema.kind`、`sources/registry.ts` | 设置里 Source 的 key 被当作 kind，一个 kind 只能一个实例 | Schema 增加可选 `kind`（缺省=id，旧配置语义不变）；registry 按实例解析 kind；**超过一个 deployment 实例时 setup 明确报错**而非静默用错仓库 | ✅ C1，C2/C3 见 `docs/010` |
+
+两条都要保持：**新增可选字段 + 明确拒绝未支持组合**，这样既向前推进，也不会让运行中的单实例部署悄悄行为改变。
+

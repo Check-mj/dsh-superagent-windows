@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { UserError } from '../core/index.ts'
 import { SETUP_FIELDS, resolveDeployment, resolveFeishuBot, workerProbe, type Deployment, type Machine } from '../deployment.ts'
 import { agentVariables, applyEnvironment, verifyEnvironment, withoutDirectory, workerBin, writeEnvironment } from '../infra/environment.ts'
-import type { Settings, SettingsBlock } from '../policy.ts'
+import { instancesOf, type Settings, type SettingsBlock } from '../policy.ts'
 import { SetupError, type SetupProblem } from '../setup.ts'
 
 export interface SetupHost {
@@ -76,7 +76,12 @@ export class Setup {
   private async resolve(settings: Settings): Promise<Deployment> {
     const { context, machine, lifetime } = this.host
     const probe = this.probe()
-    const deployment = await resolveDeployment(machine, settings.sources.github?.config, probe)
+    // Several GitHub Sources are describable now (an instance names its kind), but one deployment is still resolved
+    // per process: refusing is better than silently serving one repository with another instance's account.
+    const deployments = instancesOf(settings, 'github')
+    if (deployments.length > 1) throw new SetupError('multipleSourcesUnsupported', { sources: deployments.join(', ') })
+    const [githubId = 'github'] = deployments
+    const deployment = await resolveDeployment(machine, settings.sources[githubId]?.config, probe)
     const feishu = await resolveFeishuBot(machine, settings.sources.feishu?.config, probe).catch((error: unknown) => {
       if (!(error instanceof SetupError)) throw error
       this.feishuProblem = error.problem

@@ -95,7 +95,20 @@ export const ExecutorConfigSchema = z.object({
   prepare: z.string().max(LIMITS.prepareCommand).default(''),
   blockedCommands: z.array(CommandNameSchema).default([]),
 }).strict()
-export const SourceInstanceSchema = z.object({ enabled: z.boolean().default(true), config: z.record(z.string(), z.unknown()).default({}) }).strict()
+/** Which kind a stored instance belongs to: its `kind` field, or its id when it does not name one. */
+export const sourceKindOf = (id: string, stored?: { kind?: string }): string => stored?.kind ?? id
+/**
+ * A configured Source. `kind` lets one kind have several instances (`organization-a`, `organization-b`);
+ * it defaults to the id, so a stored `github` entry keeps meaning kind `github`.
+ */
+export const SourceInstanceSchema = z.object({
+  kind: z.string().regex(/^[a-z][a-z0-9-]*$/).optional(),
+  enabled: z.boolean().default(true),
+  config: z.record(z.string(), z.unknown()).default({}),
+}).strict()
+/** The instance ids whose kind is one of `kinds`, in id order. */
+export const instancesOf = (settings: Settings, ...kinds: string[]): string[] =>
+  Object.entries(settings.sources).filter(([id, stored]) => kinds.includes(sourceKindOf(id, stored))).map(([id]) => id).sort()
 export const SettingsSchema = z.object({
   paused: z.boolean().default(false),
   sources: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/), SourceInstanceSchema).default({}),

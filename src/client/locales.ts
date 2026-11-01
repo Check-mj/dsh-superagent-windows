@@ -728,6 +728,7 @@ const TEXT = {
   'setup.repositoryUnset': ['GitHub 来源没有设置监听的仓库。', SETUP_PROBLEMS.repositoryUnset[1]],
   'setup.foreignFile': ['{file} 不是 dsh-superagent 写入的文件；移走它，或换一个状态目录。', SETUP_PROBLEMS.foreignFile[1]],
   'setup.gitTooOld': ['git 没有读取 dsh-superagent 为 github.com 写的凭据配置；需要 git 2.32 或更新版本。', SETUP_PROBLEMS.gitTooOld[1]],
+  'setup.multipleSourcesUnsupported': ['当前版本只支持一个 GitHub 来源，但配置了多个：{{sources}}。在支持多实例部署之前，请只保留一个。', 'This build serves one GitHub Source, but these were configured: {{sources}}. Keep one until per-instance deployment is available.'],
   'setup.environmentFailed': ['准备智能体的运行环境失败。', SETUP_PROBLEMS.environmentFailed[1]],
   'setup.agentCliUnset': ['没有设置智能体的 GitHub CLI。', SETUP_PROBLEMS.agentCliUnset[1]],
   'setup.agentCliMissing': ['找不到智能体的 GitHub CLI。', SETUP_PROBLEMS.agentCliMissing[1]],
