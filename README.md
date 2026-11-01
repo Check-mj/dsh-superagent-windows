@@ -107,6 +107,10 @@ dsh plugin --profile superagent add "git+ssh://git@github.com/Check-mj/dsh-super
 
 仓库已包含构建产物（`lib/`），安装时无需再构建。想在本机 checkout 上改代码时改用 `link:<checkout>`。
 
+## 发布者
+
+发布前跑一条命令：`pnpm release:check`（逐项 PASS/FAIL，失败退出码非 0）。细则见 [`docs/020`](docs/020-release-checklist.md)；视频脚本见 [`docs/019`](docs/019-video-script.md)。
+
 ## 目录结构
 
 ```

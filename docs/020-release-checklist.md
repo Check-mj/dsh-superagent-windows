@@ -2,6 +2,21 @@
 
 > 发布前逐项打勾；任一项不过就不发。每项都写明"用什么命令/看什么"。
 
+## 一条命令先跑一遍
+
+```powershell
+pnpm release:check
+# 或：powershell -NoProfile -ExecutionPolicy Bypass -File scriptselease-check.ps1
+```
+
+自动检查：工作区干净且已推送、归属标注齐全（README/NOTICE/LICENSE/locale/package）、CHANGELOG 有该版本、
+`typecheck`/`build`/全部测试、Release 资产与一行安装器的校验值一致。输出逐项 PASS/FAIL，任一失败退出码非 0。
+
+`-SkipTests` 只跑结构检查（几十秒）；`-SkipOnline` 跳过 GitHub 部分（离线用）。
+
+
+> 发布前逐项打勾；任一项不过就不发。每项都写明"用什么命令/看什么"。
+
 ## A. 代码与测试
 
 - [ ] `pnpm typecheck` 通过
