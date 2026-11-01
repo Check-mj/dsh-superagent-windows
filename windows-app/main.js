@@ -61,6 +61,28 @@ const REQUESTED_PORT = String((INSTANCE_RECORD && INSTANCE_RECORD.port) ?? proce
 /** The instance's own state directory; undefined keeps the profile's configured one. */
 const INSTANCE_STATE_DIR = (INSTANCE_RECORD && INSTANCE_RECORD.stateDir) || process.env.SUPERAGENT_STATE_DIR;
 const INSTANCE_LABEL = INSTANCE_RECORD && (INSTANCE_RECORD.label || INSTANCE_RECORD.name);
+/**
+ * `ghConfigFrom` names another instance whose signed-in gh configuration this one may reuse, so a second
+ * context boundary on the same agent account does not need a second sign-in. It is explicit per record and only
+ * copies when this instance has no credentials yet: the credential directory stays per instance (§8.4).
+ */
+function seedInstanceCredentials(record) {
+  if (!record || !record.ghConfigFrom || !record.stateDir) return;
+  try {
+    const source = (readInstanceRecord(record.ghConfigFrom) || {}).stateDir;
+    if (!source) { log('[instance] ghConfigFrom names no record: ' + record.ghConfigFrom); return; }
+    const from = path.join(String(source), 'gh-config');
+    const to = path.join(String(record.stateDir), 'gh-config');
+    if (!fs.existsSync(from)) { log('[instance] no gh-config to copy from ' + record.ghConfigFrom); return; }
+    if (fs.existsSync(path.join(to, 'hosts.yml'))) return;
+    fs.mkdirSync(to, { recursive: true });
+    for (const file of ['config.yml', 'hosts.yml']) {
+      const src = path.join(from, file);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(to, file));
+    }
+    log('[instance] seeded gh credentials for ' + record.name + ' from ' + record.ghConfigFrom);
+  } catch (error) { log('[instance] could not seed gh credentials: ' + error.message); }
+}
 const URL_RE = /dsh web:\s*(https?:\/\/[^\s"'<>]+)/;
 
 /* ------------------------------------------------------------------ */
@@ -1039,6 +1061,7 @@ if (!gotLock) {
     createWindow();
     showSplash();
     buildMenu();
+    seedInstanceCredentials(INSTANCE_RECORD);
     startBackend();
   });
 

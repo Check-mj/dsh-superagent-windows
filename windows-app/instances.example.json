@@ -12,7 +12,8 @@
       "label": "Team B",
       "profile": "superagent",
       "stateDir": "C:/Users/<you>/.dsh/state/team-b",
-      "port": 0
+      "port": 0,
+      "ghConfigFrom": "default"
     }
   ]
 }

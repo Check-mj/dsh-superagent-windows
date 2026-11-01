@@ -61,12 +61,27 @@ windows-app\instances.ps1 -Action remove -Name team-b
 
 即：同一个应用可同时开两个窗口，各跑一个上下文边界，状态与凭据目录互不相干。
 
-## 5. 新实例的第一次启动（务必知道）
+## 5. 新实例的第一次启动
 
-新实例的 `<stateDir>/gh-config` 是空的，首次 setup 会以 `agentCliSignedOut` 失败——这是 §8.4 凭据边界**正确工作**的表现。二选一：
+新实例的 `<stateDir>/gh-config` 是空的，首次 setup 会以 `agentCliSignedOut` 失败——这是 §8.4 凭据边界**正确工作**的表现。两种解决方式：
 
-- 在该实例的日志/面板提示下，用它的 `GH_CONFIG_DIR` 跑一次 `gh auth login`；或
-- 同账号多实例时，复制已有实例的 `gh-config\config.yml` 与 `hosts.yml`。
+**（推荐）在实例记录里显式声明复用：**
+
+```json
+{ "name": "team-b", "label": "Team B", "stateDir": "C:/Users/<you>/.dsh/state/team-b", "ghConfigFrom": "default" }
+```
+
+应用在启动后端之前执行一次**有条件的**复制：仅当本实例的 `gh-config` 还没有 `hosts.yml`（即尚未登录）时，从 `ghConfigFrom` 指明的实例复制 `config.yml` 与 `hosts.yml`，并写一行日志。凭据目录**仍然是每实例一份**，跨边界不共享运行期状态；这是"同账号多边界"的便利，不是默认行为，也不需要手工操作。
+
+**（或）手工登录该实例：**
+
+```powershell
+set "GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\<instance>\gh-config"
+& "$env:LOCALAPPDATA\Programs\Superagent	ools\ghin\gh.exe" auth login
+```
+
+实测（本轮）：删掉 `team-b` 的 `gh-config` 后加 `"ghConfigFrom": "default"` 启动，日志出现
+`[instance] seeded gh credentials for team-b from default`，随后 `setup: null`、`runtime: ready`、`stateDir=.../superagent-b`。
 
 ## 6. 顺带修掉的一个安装器缺陷
 
