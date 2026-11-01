@@ -74,8 +74,22 @@ standard 的全套工具（含 `edit`、`subagent`）留在那里，既没有我
 Router 待遇（`SocketHost.routerIds()`、`decorate` 对每个 Router 生效、`router` 健康项）✅，实测
 `routerShards: 2` 时健康显示 `2 Router Sessions (sharded by Thread)` 且磁盘上出现 `orchestrator-…-shard-1`。
 **分发已接线**：候选卡片按 Trigger 的 Thread 投递到对应分片（`MasterAssessor.deliver` 增加 `thread` 参数，运行时 `routerFor(thread)` 解析）；无 Thread 或无工单的消息仍进主 Router。
-**验收状态**：放置规则有 4 个测试锁定 Thread 亲和性；分片 Session 预置与 `router` 健康项已实测（`2 Router Sessions (sharded by Thread)`）。
-**仍未验证**：真实 Trigger 的分发——需要一条真实环境事件（智能体账号不能自己触发自己，这是设计约束），因此该路径目前只有单元级证据。
+**验收状态：已通过真实事件验收（2026-11-01 15:29）**。另一账号在 `Check-mj/superagent-playground` 的 issue #3
+发了一条**不带 @** 的评论（名单内、未点名 → 语义候选），实测得到：
+
+| 预期 | 实测 |
+|---|---|
+| 触发被接收且 Thread 为 `github:3` | ✅ `trigger 07:29:06 threads=[{github, id:3}]` |
+| `github:3` 哈希到 shard 1 | ✅ 放置函数计算一致 |
+| 分片会话**按需创建** | ✅ 健康项 `1 of 2` → `2 of 2 Router Sessions`，会话目录 `orchestrator-…-shard-1` 出现 |
+| 候选落 shard 1、主 Router 不接 | ✅ shard-1 会话里 `LICENSE` 出现 88 次、`orchestrator_eval` 46 次；主 Router 里 `LICENSE` **0 次** |
+| 语义层产出决策 | ✅ `decision 07:30:14 thread=github:3 kind=ignore reason=said`（带模型给的判断文本） |
+
+**发现的两处非缺陷事实**（记录以免重复踩坑）：① 带 @ 的名单内消息走 `explicitRouted` Fast Path，直接进工单/worker，
+不经过 Router，因此不该用这类事件验分片；② 不带 @ 的评论只有在 `observeComments` 开启或 Thread 已订阅时才被轮询到，
+且观察游标从开启时刻往后算。
+
+**可选补验**：同一 Thread 的第二条事件仍落同一分片（放置函数已有单元测试覆盖，真实事件只验了一条）。
 
 ### P3 · Watchdog 深化（§6）— ✅ 已实现（watchdogStallMinutes / watchdogGuidance / 空 digest 不投递）
 
