@@ -15,16 +15,16 @@ No browser tab, no installer, no admin rights.
 | --- | --- |
 | **Desktop shortcut** (primary) | `%USERPROFILE%\Desktop\DSH-Superagent.lnk` |
 | Start Menu shortcut | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Superagent\Superagent.lnk` |
-| Portable launcher (`.cmd`, fallback) | `D:\1111\superagent-app\启动 DSH-Superagent.cmd` |
-| Portable executable | `D:\1111\superagent-app\Superagent\Superagent.exe` |
+| Portable launcher (`.cmd`, fallback) | `<install>\启动 DSH-Superagent.cmd` |
+| Portable executable | `<install>\Superagent\Superagent.exe` |
 
 Both shortcuts start:
 
 ```
-"D:\1111\superagent-app\Superagent\Superagent.exe" --no-sandbox --disable-gpu
+"<install>\Superagent\Superagent.exe" --no-sandbox --disable-gpu
 ```
 
-with working directory `D:\1111\superagent-app\Superagent`.
+with working directory `<install>\Superagent`.
 
 `--no-sandbox` / `--disable-gpu` are required on this machine: without them
 Chromium crashes during startup before any JavaScript runs (observed here with
@@ -47,7 +47,7 @@ defence in depth.
 ## 2. Layout / sizes
 
 ```
-D:\1111\superagent-app\
+<install>\
 ├─ Superagent\                  368 MB   portable app (copy anywhere)
 │  ├─ Superagent.exe           246 MB   Electron 44.7.0, renamed
 │  ├─ <electron runtime files>          dlls, pak, locales, resources.pak, ...
@@ -205,7 +205,7 @@ automatic, because a crash loop would otherwise hide the cause.
 ## 6. Rebuild / change configuration
 
 ```bat
-cd /d D:\1111\superagent-app
+cd /d <install>
 :: 1. install Electron (npm 11 blocks install scripts by default -> allowScripts
 ::    field in package.json is already set; the binary download may need a mirror)
 set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
