@@ -1335,3 +1335,14 @@ Remove-Item -Recurse -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\
 
 > 本文件由 Windows 移植过程维护。仓库是对上游的 **git fork**：移植改动集中在 `src/deployment.ts`（`stateDir` 校验、账号探测的 PATH/`GH_CONFIG_DIR` 注入）、`src/infra/environment.ts`（`.cmd` 命令 shim、`GH_CONFIG_DIR=<stateDir>\gh-config`、git 配置）、`src/app/setup.ts`（Windows 环境应用）、`scripts/dsh-superagent`（Windows 进程管理分支），以及新增的 `scripts/dsh-superagent.cmd`、`scripts/dsh-service-hook.mjs`、`windows-app\`（Electron 壳 + 安装器）、`tests/windows-port.spec.ts`。其余行为与上游一致。
 > 权威文档：差量清单与升级流程 `<checkout>\WINDOWS-DELTA.md`；应用布局与路径解析 `<checkout>\windows-app\INSTALL.md`；本文件是操作手册，第 11 节是摘要、第 12 节是验证状态。
+
+### 应用打开后窗口是黑的（后端正常）
+
+现象：标题栏正常、后端日志有 `[ready] backend URL`，但界面一片空白。原因是应用 userData 里的界面缓存损坏
+（强制结束进程后偶发），与业务代码无关。
+
+- **自动**：应用会在页面加载 12 秒后自检一次，发现空白就清缓存并重载一次；仍空白会给出提示页。
+- **手动**：菜单「文件 → 修复界面卡住（清空缓存并重启）」。
+- **彻底**：关闭应用后删除 `%APPDATA%\Superagent` 下的 `Cache`、`Code Cache`、`GPUCache`、`Local Storage`、
+  `Session Storage` 目录再启动（会话与配置不在那里，不受影响）。
+

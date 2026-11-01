@@ -790,6 +790,7 @@ function startBackend() {
     startHealthWatch();
     if (state.win && !state.win.isDestroyed()) {
       state.win.loadURL(url).catch((e) => log('[ready] loadURL failed: ' + e.message));
+      watchForBlankPage();
     }
   }
 }
@@ -940,6 +941,48 @@ function cleanupOrphanBackends() {
     }
     if (!pids.length) log('[health] no orphan backend found');
   } catch (error) { log('[health] orphan cleanup failed: ' + error.message); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Blank renderer recovery                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The panel is served by the backend, but a corrupt HTTP/local cache in the app's user data directory can leave the
+ * window black while the backend is perfectly healthy. After the page loads, look at it once: if it rendered nothing,
+ * clear the cache and reload once; if it is still empty, say so with the menu action that fixes it.
+ */
+function watchForBlankPage() {
+  clearTimeout(state.blankTimer);
+  state.blankTimer = setTimeout(async () => {
+    try {
+      if (!state.win || state.win.isDestroyed() || !state.ready) return;
+      const seen = await state.win.webContents.executeJavaScript(
+        '({ title: document.title, text: (document.body ? document.body.innerText.length : 0) })').catch(() => null);
+      if (!seen || seen.title || seen.text > 20) return;
+      state.blankRetries = (state.blankRetries || 0) + 1;
+      log('[blank] renderer is empty (title empty, ' + seen.text + ' chars); attempt ' + state.blankRetries);
+      await clearUiCache(false);
+      if (state.blankRetries < 2) {
+        if (state.win && !state.win.isDestroyed()) state.win.webContents.reloadIgnoringCache();
+        watchForBlankPage();
+      } else {
+        showError('界面空白（缓存可能已损坏）', JSON.stringify(seen),
+          '后端正常但界面没有渲染出来。请在「文件」菜单选择「修复界面卡住（清空缓存并重启）」；状态与会话不受影响。');
+      }
+    } catch (error) { log('[blank] check failed: ' + error.message); }
+  }, 12000);
+}
+
+/** Clears the renderer caches that go bad; with relaunch it also restarts the app. */
+async function clearUiCache(relaunch) {
+  try {
+    const { session } = require('electron');
+    await session.defaultSession.clearCache();
+    await session.defaultSession.clearStorageData({ storages: ['localstorage', 'indexdb', 'cachestorage', 'serviceworkers', 'shadercache'] });
+    log('[blank] UI cache and storage cleared');
+  } catch (error) { log('[blank] could not clear the UI cache: ' + error.message); }
+  if (relaunch) { app.relaunch(); app.exit(0); }
 }
 function stopBackend() {
   return new Promise((resolve) => {
@@ -1128,6 +1171,7 @@ function buildMenu() {
         { label: '实例…', click: () => instancesUi.openInstancesWindow() },
         { type: 'separator' },
         { label: '重启后端', accelerator: 'CmdOrCtrl+Shift+R', click: () => restartBackend() },
+        { label: '修复界面卡住（清空缓存并重启）', click: () => { void clearUiCache(true); } },
         { type: 'separator' },
         { label: '打开日志文件夹', click: () => shell.openPath(USER_DATA).catch(() => {}) },
         { type: 'separator' },
