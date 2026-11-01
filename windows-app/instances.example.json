@@ -1,0 +1,18 @@
+{
+  "instances": [
+    {
+      "name": "default",
+      "label": "Main",
+      "profile": "superagent",
+      "stateDir": "C:/Users/<you>/.dsh/state/superagent",
+      "port": 0
+    },
+    {
+      "name": "team-b",
+      "label": "Team B",
+      "profile": "superagent",
+      "stateDir": "C:/Users/<you>/.dsh/state/team-b",
+      "port": 0
+    }
+  ]
+}

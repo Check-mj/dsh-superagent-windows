@@ -27,8 +27,40 @@ const APP_TITLE = 'Superagent';
 const SPLASH_DELAY_MS = 0;
 const START_TIMEOUT_MS = Number(process.env.SUPERAGENT_START_TIMEOUT_MS || 90000);
 const KILL_GRACE_MS = 2000;
-const PROFILE = process.env.SUPERAGENT_PROFILE || 'superagent';
-const REQUESTED_PORT = String(process.env.SUPERAGENT_PORT || '0');
+/* ------------------------------------------------------------------ */
+/* Instances: one window per context boundary (article §8.3)            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `--instance <name>` (or SUPERAGENT_INSTANCE) selects one record of <install>/config/instances.json.
+ * Each record names its own DSH profile, state directory and port, so several context boundaries run as
+ * separate windows of the same application. Without the flag the app behaves exactly as before.
+ */
+function instanceFlag(argv) {
+  const index = argv.indexOf('--instance');
+  const value = index >= 0 ? argv[index + 1] : process.env.SUPERAGENT_INSTANCE;
+  return value && !String(value).startsWith('--') ? String(value) : undefined;
+}
+function readInstanceRecord(name) {
+  const file = path.join(path.dirname(process.execPath), 'config', 'instances.json');
+  let parsed;
+  try { parsed = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); }
+  catch (error) {
+    log('[instance] could not read ' + file + ': ' + error.message);
+    return undefined;
+  }
+  const list = Array.isArray(parsed) ? parsed : (parsed && parsed.instances) || [];
+  const record = list.find((entry) => entry && entry.name === name);
+  if (!record) log('[instance] no record named ' + name + ' in ' + file);
+  return record;
+}
+const INSTANCE = instanceFlag(process.argv);
+const INSTANCE_RECORD = INSTANCE ? readInstanceRecord(INSTANCE) : undefined;
+const PROFILE = (INSTANCE_RECORD && INSTANCE_RECORD.profile) || process.env.SUPERAGENT_PROFILE || 'superagent';
+const REQUESTED_PORT = String((INSTANCE_RECORD && INSTANCE_RECORD.port) ?? process.env.SUPERAGENT_PORT ?? '0');
+/** The instance's own state directory; undefined keeps the profile's configured one. */
+const INSTANCE_STATE_DIR = (INSTANCE_RECORD && INSTANCE_RECORD.stateDir) || process.env.SUPERAGENT_STATE_DIR;
+const INSTANCE_LABEL = INSTANCE_RECORD && (INSTANCE_RECORD.label || INSTANCE_RECORD.name);
 const URL_RE = /dsh web:\s*(https?:\/\/[^\s"'<>]+)/;
 
 /* ------------------------------------------------------------------ */
@@ -389,8 +421,8 @@ function writePatchOverlay(port) {
   ];
   // Testing escape hatch: point the plugin at a separate stateDir so this app
   // can run while another backend holds the default state lock.
-  if (process.env.SUPERAGENT_STATE_DIR) {
-    const sd = String(process.env.SUPERAGENT_STATE_DIR).replace(/\\/g, '/');
+  if (INSTANCE_STATE_DIR) {
+    const sd = String(INSTANCE_STATE_DIR).replace(/\\/g, '/');
     lines.push('- id: dsh-superagent', '  config:', '    stateDir: ' + sd);
   }
   lines.push('');
@@ -613,7 +645,7 @@ function extraWithHint(base) {
   const all = state.stdoutBuf + '\n' + state.stderrBuf;
   const hints = [];
   if (/Lock file is already being held/i.test(all)) {
-    const stateDir = process.env.SUPERAGENT_STATE_DIR ||
+    const stateDir = INSTANCE_STATE_DIR ||
       path.join(os.homedir(), '.dsh', 'state', 'superagent');
     hints.push('另一个 Superagent 后端正在运行并占用同一 stateDir（' + stateDir + '）。' +
       '请先关闭其它实例；或设置环境变量 SUPERAGENT_STATE_DIR 指向独立状态目录后再启动。');
@@ -846,7 +878,7 @@ function createWindow() {
     y: saved.y,
     minWidth: MIN_BOUNDS.width,
     minHeight: MIN_BOUNDS.height,
-    title: APP_TITLE,
+    title: INSTANCE_LABEL ? APP_TITLE + ' — ' + INSTANCE_LABEL : APP_TITLE,
     icon: isFile(ICON) ? ICON : undefined,
     backgroundColor: '#151517',
     autoHideMenuBar: true,
@@ -1000,6 +1032,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     log(`[app] starting ${app.getVersion()} | Electron ${process.versions.electron} | electron=${process.execPath}`);
+    if (INSTANCE) log('[instance] ' + INSTANCE + ' | profile=' + PROFILE + ' | stateDir=' + String(INSTANCE_STATE_DIR || '(profile)') + ' | port=' + REQUESTED_PORT);
     log('[app] userData: ' + USER_DATA + (USER_DATA_INFO.writable ? '' : ' (WARNING: not writable)'));
     try { log('[app] app.getPath(userData): ' + app.getPath('userData')); } catch (e) { log('[app] getPath failed: ' + e.message); }
     if (isFile(ICON)) app.setAppUserModelId('com.superagent.desktop');

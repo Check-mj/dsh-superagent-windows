@@ -49,8 +49,13 @@ Write-Host ("checkout     : " + $checkout)
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $Root 'config') | Out-Null
 
+# A running window holds the executable and its resources: copying then fails or retries forever.
+if (Get-Process -Name Superagent -ErrorAction SilentlyContinue) {
+  Write-Host 'Superagent is running. Close its window(s) and re-run the installer.' -ForegroundColor Yellow
+  exit 2
+}
 Write-Host 'Copying the application...'
-$copyArgs = @($appSource, $Root, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP')
+$copyArgs = @($appSource, $Root, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:2', '/W:2')
 if ($Force) { $copyArgs += '/IS' }
 $rc = Start-Process -FilePath 'robocopy.exe' -ArgumentList $copyArgs -Wait -PassThru -NoNewWindow
 # robocopy: 0-7 are success codes, 8+ are failures.
