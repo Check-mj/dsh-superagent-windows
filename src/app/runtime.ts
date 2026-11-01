@@ -42,6 +42,7 @@ import { feishuSettings } from '../sources/feishu.ts'
 import { health, type Health, type SourceContext, type SourceHost } from '../sources/host.ts'
 import { Sessions } from './sessions.ts'
 import { Settings } from './settings.ts'
+import { loadDeclarative } from './config-file.ts'
 import { sourceContextOf, type SourceContextDeps } from './source-context.ts'
 import type { ResourceHost } from './resources.ts'
 import { mainTools, type MainToolsHost } from './tools/main.ts'
@@ -201,6 +202,7 @@ export class Runtime extends Service implements SourceHost {
   private async initialize(): Promise<void> {
     // Register management HTTP routes before setup completes so operators can fix setup problems in the UI.
     this.disposers.push(registerHttp(this.ctx, this.httpHost()))
+    this.applyDeclarativeSettings()
     if (!await this.setup.run(this.store.settings())) {
       this.runtimeHealth.set({ ...health('paused', 'setupPending'), at: now() })
       return
@@ -215,6 +217,21 @@ export class Runtime extends Service implements SourceHost {
     this.passes.start()
     this.effects.start()
     this.runtimeHealth.set({ state: 'ready', detail: 'Orchestrator is ready', at: now() })
+  }
+  /**
+   * Apply the declarative settings file the machine configuration names, so Sources, Policy, Execution and Prompts
+   * can live in version control. A malformed file is logged and ignored: a typo must not stop the service, and the
+   * panel keeps showing the settings that were already stored.
+   */
+  private applyDeclarativeSettings(): void {
+    const path = this.machine.configPath
+    if (!path) return
+    const current = this.store.settings()
+    const result = loadDeclarative(path, current)
+    if ('error' in result) { this.ctx.logger.warn('dsh-superagent: %s', result.error); return }
+    if (JSON.stringify(result.settings) === JSON.stringify(current)) return
+    this.store.saveSettings(result.settings, { source: 'internal', policyVersion: '', policyChanged: false, notified: [] })
+    this.ctx.logger.info('dsh-superagent: applied the declarative settings in %s', path)
   }
   private httpHost(): HttpHost {
     const runtime = this
