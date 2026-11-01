@@ -1,5 +1,7 @@
 # 安装 DSH-Superagent（桌面版）
 
+> **路径含空格也没问题**：安装根目录可以带空格（例如用户名是 `John Doe` 时，默认路径就是 `C:\Users\John Doe\AppData\Local\Programs\Superagent`）。安装器会给复制参数加引号，并在复制后校验 `Superagent.exe` 真的落地，否则直接报错而不是假装成功。
+
 ## 最快的方式
 
 ```powershell

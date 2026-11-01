@@ -24,6 +24,7 @@
 - [ ] `node windows-app/build-portable.js` 产出 payload
 - [ ] 用 payload 打包 zip，并记录 SHA-256
 - [ ] 在**干净目录**跑包内 `install.ps1`：生成 `Superagent.exe` 与 `config\paths.json`
+- [ ] **含空格的安装路径**也要成功（例如 `D:	mp\Path With Spaces`）；失败时安装器必须报错，不得只写 `paths.json`
 - [ ] 安装后快捷方式名为 `DSH-Superagent.lnk`；窗口标题 `DSH-Superagent`；关于框版本与发布版本一致
 - [ ] 卸载/删除测试安装目录，确保未动真实安装与 `%APPDATA%\Superagent`
 
