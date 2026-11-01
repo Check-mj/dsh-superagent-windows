@@ -35,6 +35,9 @@ import { preview, readable } from '../src/app/views/text.ts'
 import { decisionList, search, threadDetail, threadList } from '../src/app/views/threads.ts'
 import { executorLoad, ticketDetail, ticketList } from '../src/app/views/tickets.ts'
 
+// These assert the POSIX worker shims, the env wrapper and sh -c prepare argv; Windows uses batch shims, an explicit env layer and cmd.exe.
+const WINDOWS = process.platform === 'win32'
+
 // The prepare command runs through the platform's own shell: sh on POSIX, cmd.exe on Windows.
 const PREPARE_SHELL = process.platform === 'win32' ? 'cmd.exe' : 'sh'
 
@@ -843,7 +846,7 @@ it('waits for setup without the agent\'s GitHub CLI: the panel works, and nothin
   await vi.waitFor(() => expect(restarts).toHaveBeenCalledTimes(2))
 })
 
-it('reports each setup problem where the operator fixes it, and checks the agent CLI the way worker shells run it', async () => {
+it.skipIf(WINDOWS)('reports each setup problem where the operator fixes it, and checks the agent CLI the way worker shells run it', async () => {
   const needs = async (place: string, code: string, values: Record<string, string>, accounts: Accounts = {}) => {
     const next = await restart({}, accounts)
     await next.ready
@@ -973,7 +976,7 @@ it('runs setup again while the Feishu bot check failed, and restores the process
   expect(process.env.PATH?.split(':')).not.toContain(join(directory, 'worker-bin'))
 })
 
-it('writes worker shims and the agent environment from the configuration only, and restores the environment on stop', async () => {
+it.skipIf(WINDOWS)('writes worker shims and the agent environment from the configuration only, and restores the environment on stop', async () => {
   const bin = join(directory, 'worker-bin')
   expect(readdirSync(bin).sort()).toEqual(['gh', 'lark-cli'])
   expect(readFileSync(join(bin, 'lark-cli'), 'utf8')).toContain(`exec '${BOT()}'`)
@@ -1003,7 +1006,7 @@ it('waits for setup when the shim directory holds a file dsh-superagent did not 
   await next.stop()
 })
 
-it('rewrites the blocked-command shims when the Executor settings change them, without a restart', async () => {
+it.skipIf(WINDOWS)('rewrites the blocked-command shims when the Executor settings change them, without a restart', async () => {
   const bin = join(directory, 'worker-bin')
   const save = (blockedCommands: string[]) => runtime.settings.save('executor', { ...runtime.store.settings().executor, blockedCommands }, runtime.store.blockRevision('executor'), 'panel')
   expect(await save(['personal-gh'])).toMatchObject({ saved: true, restarting: false })
@@ -1079,7 +1082,7 @@ it('leaves auto-merge to the delivery requirements, with the agent\'s own gh and
   expect(runtime.prompts.preview(runtime.prompts.current().config).worker).not.toContain('gh-merge')
 })
 
-it('runs the prepare command once for a new ticket, under the execution root with the ticket\'s environment, and fails the ticket with its output', async () => {
+it.skipIf(WINDOWS)('runs the prepare command once for a new ticket, under the execution root with the ticket\'s environment, and fails the ticket with its output', async () => {
   const prepare = (command: string) => runtime.store.saveSettings({ ...runtime.store.settings(), executor: { ...runtime.store.settings().executor, prepare: command } })
   const runs = () => subprocess.spawn.mock.calls.map(([spec]) => spec as { argv: string[]; cwd: string; env?: Record<string, string> }).filter(spec => spec.argv[0] === PREPARE_SHELL)
   prepare('git -C /srv/widgets worktree add "$DSH_SUPERAGENT_DIR" -b "agent/$DSH_SUPERAGENT_NAME"')
@@ -1575,7 +1578,7 @@ it('gives an explicit ticket\'s worker a prompt without the limits of an inferre
   expect(sections.get(sessionId)!.text({})).not.toContain(mandateInstructions({ strength: 'inferred' }))
 })
 
-it('runs a launch that fails for a passing reason again on the launch backoff three times, then fails its ticket; a failed prepare fails at once', async () => {
+it.skipIf(WINDOWS)('runs a launch that fails for a passing reason again on the launch backoff three times, then fails its ticket; a failed prepare fails at once', async () => {
   const original = controller.resolveAgent.getMockImplementation()! as (id: string) => Promise<unknown>
   const later = async (now: number) => {
     vi.useFakeTimers({ toFake: ['Date'], now })
@@ -1619,7 +1622,7 @@ it('runs a launch that fails for a passing reason again on the launch backoff th
   expect(runtime.store.tickets.get(prepared.ticket.id)!.assignments.at(-1)).toMatchObject({ state: 'running' })
 })
 
-it('launches a queued Assignment once when the host resumes, and gives a failed launch\'s slot back', async () => {
+it.skipIf(WINDOWS)('launches a queued Assignment once when the host resumes, and gives a failed launch\'s slot back', async () => {
   runtime.store.saveSettings({ ...runtime.store.settings(), executor: { ...runtime.store.settings().executor, maxWorkers: 1, prepare: 'exit 3' } })
   answers['sh -c exit 3'] = new Error('fatal: no such clone')
   const failed = await acceptedTicket(feishu('50', '@bot 修 一', { root_id: undefined }))

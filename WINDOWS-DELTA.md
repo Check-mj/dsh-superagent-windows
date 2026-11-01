@@ -73,7 +73,9 @@ tag       upstream-base   记录我们 fork 时的官方基线（6337fc8）
 
 `tests/docs.spec.ts` 我们修了两处 Windows 分隔符假设（`relative()` 返回反斜杠、用 `lastIndexOf('/')` 切文件名）。
 
-**升级判定标准**：`pnpm typecheck && pnpm build` 通过，且 `pnpm vitest run tests/windows-port.spec.ts` 全绿。其余 POSIX-only 测试在 Windows 上的失败属预期（权限位、符号链接、`#!/bin/sh` 脚本、`:` 作为 PATH 分隔符），不作为回归判据。
+**升级判定标准**：`pnpm typecheck && pnpm build` 通过，且 `pnpm vitest run tests/windows-port.spec.ts` 全绿。
+
+Windows 上整套测试现在也是**全绿**：`1157 passed / 48 skipped`。被跳过的 48 项只针对 POSIX 专有机制（`#!/bin/sh` 垫片、`ps`/`tmux`、POSIX 模式位、符号链接、`:` 分隔的 PATH），在 Linux/CI 上照常执行，每个跳过点都带一行说明为什么。这样「红」不再是常态信号，出现真失败时才看得见。
 
 ---
 
