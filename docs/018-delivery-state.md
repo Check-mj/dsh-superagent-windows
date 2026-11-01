@@ -61,7 +61,7 @@
 | `pnpm build` | ✅ 通过 |
 | `vitest` | ✅ **1184 passed / 48 skipped / 0 failed** |
 | 桌面应用 | ✅ `setup: null`、`runtime: ready`、`router: one Router Session` |
-| 提交与推送 | ✅ 仓库 `79444ed`，工作区干净 |
+| 提交与推送 | ✅ 发布时的 main 是 `79444ed`，工作区干净；之后的提交只改文档（最新 `git log -1 --oneline`） |
 
 ## 5. 与上游的关系（不变）
 

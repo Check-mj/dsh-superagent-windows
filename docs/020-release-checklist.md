@@ -20,7 +20,7 @@ pnpm release:check
 | 项 | 结果 |
 |---|---|
 | `pnpm release:check` | ✅ **12 passed, 0 failed / READY TO PUBLISH** |
-| Release | ✅ `v0.1.0`（tag → commit `79444ed`） |
+| Release | ✅ `v0.1.0`（tag 指向 `a7615c7`；zip 里的可执行文件与当前 `main` 逐字节一致，之后的提交只改文档） |
 | zip | `DSH-Superagent-0.1.0-win-x64.zip`，158,418,215 字节 |
 | SHA-256 | `ebf8ea2286be2b083a2ab72c6a2f1e00385587682ff6fe4ac3e09081b1912295`（与安装器 `$checksums` 一致） |
 | 桌面应用 | ✅ 实测 `setup: null`、`runtime: ready`、`router: one Router Session` |
