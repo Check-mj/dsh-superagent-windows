@@ -21,6 +21,26 @@ dsh-superagent is a proactive coding agent for one GitHub repository, packaged a
 
 It is also a way of working with an agent: **take as little human attention as possible, and give as much value as possible.** An agent that can act for a whole team can also waste a whole team's attention, so it acts only when asked or when a rule the team wrote allows it, and speaks only when someone must act or can use a result. [docs/000-philosophy.md](docs/000-philosophy.md) explains the principle and what it asks of the operator.
 
+## 发布页
+
+最新版本与校验值：<https://github.com/Check-mj/dsh-superagent-windows/releases>
+
+## 安装（推荐：桌面版，一条命令）
+
+```powershell
+irm https://raw.githubusercontent.com/Check-mj/dsh-superagent-windows/main/install.ps1 | iex
+```
+
+它会下载本仓库最新 Release、校验 SHA-256、解压并运行包内安装器（与仓库里的安装器同一份逻辑），默认装到
+`%LOCALAPPDATA%\Programs\Superagent`，并创建桌面与开始菜单快捷方式。可用环境变量覆盖：
+`$env:DSH_SUPERAGENT_ROOT`（安装目录）、`$env:DSH_SUPERAGENT_VERSION`（版本）、
+`$env:DSH_SUPERAGENT_NOSHORTCUTS = '1'`（不建快捷方式）。网络无法访问 `github.com/releases` 时，安装器会自动
+改走 `api.github.com` 下载同一个资产。
+
+装好后从快捷方式启动；面板第一个标签是**介绍**，四步上手都在里面。
+
+## 安装（可选：只装插件，不装桌面应用）
+
 ## 安装（Windows 适配版的默认方式）
 
 ```powershell

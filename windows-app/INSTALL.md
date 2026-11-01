@@ -1,3 +1,14 @@
+# 安装 DSH-Superagent（桌面版）
+
+## 最快的方式
+
+```powershell
+irm https://raw.githubusercontent.com/Check-mj/dsh-superagent-windows/main/install.ps1 | iex
+```
+
+下载 Release、校验 SHA-256、解压并调用本目录同款的 `install.ps1`（默认装到
+`%LOCALAPPDATA%\Programs\Superagent`）。下文是手动安装步骤，供离线或排错时使用。
+
 # 安装布局与路径规则
 
 本文件定义 **Superagent 的路径方案**。所有路径在运行时推导，源码里没有任何一台机器、一个用户名的绝对路径。
