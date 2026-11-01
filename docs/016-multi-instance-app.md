@@ -56,7 +56,7 @@ windows-app\instances.ps1 -Action remove -Name team-b
 
 1. 用 `instances.ps1 -Action add` 注册 `default` 与 `team-b` 两条记录。
 2. 以 `Superagent.exe --no-sandbox --disable-gpu --instance team-b` 启动。
-3. 启动日志：`[instance] team-b | profile=superagent | stateDir=C:/Users/Chen/.dsh/state/superagent-b | port=0`
+3. 启动日志：`[instance] team-b | profile=superagent | stateDir=C:/Users/<you>/.dsh/state/superagent-b | port=0`
 4. `GET /orchestrator/api/state`：`setup: null`、`runtime: ready`、`stateDir = .../state/superagent-b`
 
 即：同一个应用可同时开两个窗口，各跑一个上下文边界，状态与凭据目录互不相干。

@@ -114,7 +114,7 @@ profile 的 `cordis.patch.yml` 钉死了 `webserver.port`，命令行 `--port` �
 审计命令（提交前应无输出）：
 
 ```bash
-grep -rn -E "D:[\\\\/]{1,2}1111|C:[\\\\/]{1,2}Users[\\\\/]{1,2}[A-Za-z]" \
+grep -rn -E "Users[\/]{1,2}[A-Za-z]|[A-Za-z]:[\/]{1,2}[^ <\"]*superagent" \
   --include="*.js" --include="*.ts" --include="*.cmd" --include="*.mjs" \
   windows-app/main.js windows-app/build-portable.js scripts src tests
 ```

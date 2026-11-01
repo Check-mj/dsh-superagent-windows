@@ -133,7 +133,7 @@ the common failures (`Lock file is already being held`, `EADDRINUSE`, `EPERM`).
 Explorer's `PATH` has **no git** on this machine, which makes the backend report
 a misleading `git 2.32 or later` setup error. Before spawning, the app resolves
 `git`/`gh` (`where`, then known dirs: `C:\Program Files\Git\cmd`,
-`%LOCALAPPDATA%\Programs\Git\cmd`, `D:\1111\toolchain\git\cmd`, …) and prepends
+`%LOCALAPPDATA%\Programs\Git\cmd`, a bundled `<install>\tools\git\cmd`, …) and prepends
 the found directories to the child `PATH`. If one is missing it does **not**
 fail: the missing tool is logged, shown on the loading page, and as a
 dismissible banner over the panel. `GH_CONFIG_DIR` is never set by the app —
@@ -147,7 +147,7 @@ Resolved before Chromium starts, in this order (first writable wins):
 
 1. `%SUPERAGENT_USER_DATA%` (if set)
 2. `%APPDATA%\Superagent`  ← **normal case**, e.g.
-   `C:\Users\Chen\AppData\Roaming\Superagent`
+   `%APPDATA%\Superagent`
 3. `<the folder containing Superagent.exe>\user-data` ← portable fallback used
    when the app runs with a restricted token (see §7)
 4. `%TEMP%\superagent-user-data`
@@ -232,7 +232,7 @@ Environment overrides (handy for testing):
 | `SUPERAGENT_STATE_DIR` | adds `- id: dsh-superagent / stateDir` to the overlay (run a second instance while the real stateDir is locked) |
 | `SUPERAGENT_USER_DATA` | force the app data directory |
 | `SUPERAGENT_NODE` / `SUPERAGENT_DSH_BIN` | force the backend executables |
-| `SUPERAGENT_CWD` | backend working directory (default `D:\1111\dsh-superagent`) |
+| `SUPERAGENT_CWD` | backend working directory (default: the checkout the shell finds beside itself) |
 | `SUPERAGENT_START_TIMEOUT_MS` | startup timeout, default `90000` |
 | `SUPERAGENT_SCREENSHOT` | `1` = capture `screenshot.png` ~4 s after each page load |
 
@@ -241,7 +241,7 @@ Environment overrides (handy for testing):
 ## 7. Known limitations / rough edges
 
 1. **One backend per stateDir.** The plugin locks
-   `C:\Users\Chen\.dsh\state\superagent`; a second backend dies with
+   `%USERPROFILE%\.dsh\state\superagent`; a second backend dies with
    `Lock file is already being held`. The app's single-instance lock covers the
    normal case and the error page explains the lock case. For parallel testing,
    set `SUPERAGENT_STATE_DIR` to a scratch directory.
@@ -252,7 +252,7 @@ Environment overrides (handy for testing):
    `EPERM ... cordis.yml`; the app detects this and says so on the error page.
    The app still works in that context when the backend's home is writable —
    which is how the verification run was done:
-   `DSH_HOME=D:\1111\run\dsh-home` + `SUPERAGENT_STATE_DIR=D:\1111\run\app-test-state`.
+   `DSH_HOME=<tmp>\dsh-home` + `SUPERAGENT_STATE_DIR=<tmp>\app-test-state`.
    A normal desktop double-click from the user's own session is not subject to
    that restriction.
 3. **`--no-sandbox`/`--disable-gpu` are required here**; they also make the
@@ -278,5 +278,5 @@ Environment overrides (handy for testing):
 | Single instance | second launch logged `second instance launch -> focusing existing window`, exactly 1 visible window, no second backend |
 | Graceful close | `SIGTERM` → `backend exited … signal=SIGTERM`, app exit in ~1 s, **0 Superagent + 0 dsh node processes** afterwards |
 | Window state | `window-state.json` written on close (`{"x":640,"y":266,"width":1280,"height":860,"maximized":false}`) |
-| git/gh preflight | `git: D:\1111\toolchain\git\cmd`, `gh: D:\1111\toolchain\gh\bin` (found via known dirs because Explorer PATH has neither) |
+| git/gh preflight | `git: <install>\tools\git\cmd`, `gh: <install>\tools\gh\bin` (found via known dirs because Explorer PATH has neither) |
 | Portable folder | 368 MB, runs from its own copy of Electron 44.7.0 |
