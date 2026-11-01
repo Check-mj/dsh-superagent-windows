@@ -421,6 +421,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/cache.spec.ts` | `TextCache` |
 | `tests/config-file.spec.ts` | The declarative settings file: a partial overlay, record merge for Sources and Policy, and text errors for a missing file, bad JSON or a schema failure |
 | `tests/source-instances.spec.ts` | A Source instance naming its kind: the id default, several instances of one kind selected by kind, and a kind that is not a valid id |
+| `tests/service-script-windows.spec.ts` | The Windows branch of `scripts/dsh-superagent`: its usage, the profile-scoped pidfile and control directory, exit 1 with no pids (also for a recorded pid that is gone), the intentional-stop marker, and a `--respect-stop` restart that leaves it alone |
 | `tests/queue.spec.ts` | The Runtime's work through the effect queue, and what earlier versions stored |
 | `tests/followups.spec.ts` | A person's follow-up on a Ticket's Thread: its notice to the main Session, the tools that act on it, what a burst costs; a worker's hand-back and context follow, and the main Session's note |
 | `tests/health.spec.ts` | One health entry per part, each cleared by its own next success |
