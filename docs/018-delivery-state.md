@@ -9,7 +9,7 @@
 | **P3 Watchdog 深化（§6）** | ✅ 已实现并真实运行验证 | `src/app/watchdog.ts`、`src/app/runtime.ts`；`tests/watchdog.spec.ts`；`docs/012` §4.1 |
 | **P4 状态存储接缝（§5）** | ✅ 已实现（接口预留，行为零变化） | `src/app/state-store.ts`、`src/app/source-context.ts`；`tests/state-store.spec.ts` |
 | **P1 异步子任务（§4.1 右半边）** | 🟡 已接线（opt-in，默认关闭），真实并发验收待做 | `src/app/subagents.ts`、`src/app/sessions.ts`；`tests/subagents.spec.ts`；`docs/017` P1 |
-| **P2 Router 分片（§2.1）** | 🟡 放置规则 + 分片 Session 预置已完成并实测，Trigger 分发待接线 | `src/app/shards.ts`、`src/app/sessions.ts`、`src/app/runtime.ts`；`tests/shards.spec.ts` |
+| **P2 Router 分片（§2.1）** | 🟡 放置、预置、分发均已接线；分发只到单元级证据（无真实 Trigger 可造） | `src/app/shards.ts`、`src/app/assessment.ts`、`src/app/sessions.ts`、`src/app/runtime.ts`；`tests/shards.spec.ts` |
 | 多实例（§8.3，前序工作） | ✅ 服务侧 + 应用侧 + 管理窗口 | `docs/015`、`docs/016` |
 | Watchdog 基础（§6，前序工作） | ✅ | `docs/012` |
 | 全双工命令侧（§4.1，前序工作） | ✅ 已锁定 | `docs/013` |
@@ -56,7 +56,16 @@
 
 所有新增能力都是**新增模块 + opt-in 配置**，不改上游语义；每项在 `WINDOWS-DELTA.md` 有差量记录，上游若实现同名能力即删我们的模块切回。未开启时行为与上游部署完全一致。
 
-## 6. P1 手动验收步骤（需要人在 Superagent 窗口里操作）
+## 6. P2 启用与验收
+
+`routerShards: N`（默认 1）。启用后：每个分片一个 Router Session（`<masterId>-shard-<i>`），`router` 健康项显示
+`N Router Sessions (sharded by Thread)`，候选按 Thread 稳定落到同一分片。
+
+要验证分发，需要一条真实环境事件：在 `Check-mj/superagent-playground` 里由**另一个账号**（`WEAaaa-sudo`）给 issue 发
+一条评论/新开 issue。看日志与路由：该 Thread 的候选只出现在其分片 Session 里，主 Router 不接它；同一 Thread 的第二条
+事件必须落同一分片。智能体账号不能自己触发自己（设计约束），所以这一步无法用本机脚本完成。
+
+## 7. P1 手动验收步骤（需要人在 Superagent 窗口里操作）
 
 自动化的 API 没有「向主会话发一条消息」的入口，所以下面这三条只能人工确认。已开启 `asyncSubagents: true` 的实例上：
 

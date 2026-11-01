@@ -20,7 +20,7 @@ import { Commands } from '../infra/commands.ts'
 import type { Deployment, Machine } from '../deployment.ts'
 import { environmentOf, ticketEnvironment, type Variable } from './execution-environment.ts'
 import { WatchdogLoop, assignmentStates, quietMinutes, stalledIds, watchdogDigest, watchdogDue, watchdogProblems } from './watchdog.ts'
-import { shardSessionIds } from './shards.ts'
+import { shardSessionIds, triggerSessionId } from './shards.ts'
 import type { SetupProblem } from '../setup.ts'
 import { DshExecutor, sourceTrigger, triggerMessage, workerSessionId } from '../executor/dsh.ts'
 import { ticketCard } from './cards.ts'
@@ -150,7 +150,8 @@ export class Runtime extends Service implements SourceHost {
         repliedTo: trigger => repliedTo({ store, sources }, trigger) })
       this.assessor = new MasterAssessor({ get engine() { return runtime.engine }, commands, get deployment() { return setup.deployment }, effects,
         settings: () => store.settings(), paused: () => this.paused(), threadContext: trigger => sources.threadContext(trigger),
-        deliver: (id, text) => sessions.prompt(masterId, id, text, 'steer'), candidateCard: candidate => candidateCard(links, candidate) })
+        deliver: (id, text, thread) => sessions.prompt(this.routerFor(thread), id, text, 'steer'),
+        candidateCard: candidate => candidateCard(links, candidate) })
       const outbox = this.outbox = new Outbox({ store, effects, sources, commands, paused: () => this.paused() })
       const { assessor, executor } = this
       const policy = () => settingsPolicy(store.settings(), sources)
@@ -272,6 +273,10 @@ export class Runtime extends Service implements SourceHost {
       this.ctx.logger.info('dsh-superagent: the declarative settings changed the Source instances (%s -> %s); restarting to mount them', before, after)
       this.setup.restart()
     }
+  }
+  /** The Router Session that owns a Thread: the master while sharding is off, else the shard the Thread hashes to. */
+  private routerFor(thread?: string): string {
+    return triggerSessionId(thread ? { thread } : {}, this.masterId, this.routerIdsValue.length)
   }
   /** Reports how many Router Sessions serve this instance, so a sharded deployment is visible in health. */
   private reportRouterHealth(): void {

@@ -57,8 +57,9 @@
 **进度**：①放置规则 `src/app/shards.ts`（FNV-1a，Thread 亲和性，4 个测试）✅；②分片 Session 预置与
 Router 待遇（`SocketHost.routerIds()`、`decorate` 对每个 Router 生效、`router` 健康项）✅，实测
 `routerShards: 2` 时健康显示 `2 Router Sessions (sharded by Thread)` 且磁盘上出现 `orchestrator-…-shard-1`。
-**待接线**：Trigger 分发放到 `triggerSessionId(thread)`（当前所有 Trigger 仍进主 Router）。
-**验收**：同一 Thread 的 Trigger 永远落到同一分片；分片数变化后旧 Thread 仍可继续；健康里能看到每个分片。
+**分发已接线**：候选卡片按 Trigger 的 Thread 投递到对应分片（`MasterAssessor.deliver` 增加 `thread` 参数，运行时 `routerFor(thread)` 解析）；无 Thread 或无工单的消息仍进主 Router。
+**验收状态**：放置规则有 4 个测试锁定 Thread 亲和性；分片 Session 预置与 `router` 健康项已实测（`2 Router Sessions (sharded by Thread)`）。
+**仍未验证**：真实 Trigger 的分发——需要一条真实环境事件（智能体账号不能自己触发自己，这是设计约束），因此该路径目前只有单元级证据。
 
 ### P3 · Watchdog 深化（§6）— ✅ 已实现（watchdogStallMinutes / watchdogGuidance / 空 digest 不投递）
 
