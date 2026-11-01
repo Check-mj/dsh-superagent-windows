@@ -60,6 +60,11 @@ it('defines the router preset the main Session runs under: the worker\'s 5-secon
   for (const name of ['@deepseek-ai/dsh-bash-sandbox', '@deepseek-ai/dsh-pwsh-sandbox', '@deepseek-ai/dsh-tool-jobs']) {
     expect(named(plugins, name), name).toEqual(named(flat(worker.plugins), name))
   }
+  // Full duplex (article §4.1): both presets must move a long command to a background job after five seconds and
+  // must not spend more than five seconds waiting on one, so the Router keeps answering while work runs.
+  expect(named(plugins, '@deepseek-ai/dsh-bash-sandbox')).toEqual([{ timeoutMs: 5000, maxTimeoutMs: 5000 }])
+  expect(named(plugins, '@deepseek-ai/dsh-pwsh-sandbox')).toEqual([{ timeoutMs: 5000, maxTimeoutMs: 5000 }])
+  expect(named(plugins, '@deepseek-ai/dsh-tool-jobs')).toEqual([{ waitTimeoutMs: 5000, maxWaitTimeoutMs: 5000 }])
   // The tools its allow list keeps: skill, bash, read, read_image and the job tools; the file tools only read.
   for (const name of ['@deepseek-ai/dsh-tool-skill', '@deepseek-ai/dsh-skill-filesystem', '@deepseek-ai/dsh-tool-bash', '@deepseek-ai/dsh-tool-jobs',
     '@deepseek-ai/dsh-agent-instructions', '@deepseek-ai/dsh-time-context', '@deepseek-ai/dsh-compaction-basic',
