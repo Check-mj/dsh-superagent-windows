@@ -1,6 +1,6 @@
 // Background subagents (docs/017 P1): the lifecycle behind an asynchronous subagent tool call (article §4.1).
 import { expect, it } from 'vitest'
-import { BackgroundSubagents, subagentFinishedMessage, type SubagentHost } from '../src/app/subagents.ts'
+import { BackgroundSubagents, assistantResult, subagentFinishedMessage, type SubagentHost } from '../src/app/subagents.ts'
 
 const harness = (options: { inlineChars?: number } = {}) => {
   const ensured: { session: string; title: string; prompt: string }[] = []
@@ -67,4 +67,16 @@ it('drops finished records past their retention so a long-lived process does not
   const second = await subagents.start({ parent: 'worker-1', session: 'worker-1-sub-2', prompt: 'b' })
   expect(first.id).not.toBe(second.id)
   expect(subagents.get(second.id)?.status).toBe('running')
+})
+
+it('reports the last assistant message as the subagent result, dropping reasoning blocks', () => {
+  const events = [
+    { type: 'user/message', data: { message: { content: [{ type: 'text', text: 'do the thing' }] } } },
+    { type: 'assistant/message', data: { message: { content: [{ type: 'reasoning', text: 'thinking' }, { type: 'text', text: 'first try' }] } } },
+    { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: 'the answer' }] } } },
+  ]
+  expect(assistantResult(events)).toBe('the answer')
+  // No assistant message at all: an empty result, never a crash.
+  expect(assistantResult([{ type: 'user/message', data: {} }])).toBe('')
+  expect(assistantResult([])).toBe('')
 })

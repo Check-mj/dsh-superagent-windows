@@ -26,8 +26,8 @@ export interface SubagentRecord {
 }
 
 export interface SubagentHost {
-  /** Creates the child Session (idempotent: an existing Session is reused). */
-  ensure(session: string, title: string, prompt: string): Promise<void>
+  /** Creates the child Session in `cwd` (idempotent: an existing Session is reused). */
+  ensure(session: string, title: string, prompt: string, cwd?: string): Promise<void>
   /** Delivers a message: the task to the child, the result to the parent. */
   deliver(session: string, text: string): Promise<void>
   now(): number
@@ -70,14 +70,14 @@ export class BackgroundSubagents {
    * Starts one background subagent and returns at once. The acknowledgement is the whole tool result: the parent keeps
    * working while the child runs.
    */
-  async start(input: { parent: string; session: string; prompt: string; title?: string }): Promise<SubagentRecord> {
+  async start(input: { parent: string; session: string; prompt: string; title?: string; cwd?: string }): Promise<SubagentRecord> {
     const startedAt = this.host.now()
     const id = this.options.nextId(input.parent, startedAt)
     const record: SubagentRecord = { id, parent: input.parent, session: input.session, prompt: input.prompt, status: 'running', startedAt }
     this.records.set(id, record)
     this.host.log(`background subagent ${id} started by ${input.parent} in ${input.session}`)
     try {
-      await this.host.ensure(input.session, input.title ?? `subagent ${id}`, input.prompt)
+      await this.host.ensure(input.session, input.title ?? `subagent ${id}`, input.prompt, input.cwd)
       await this.host.deliver(input.session, input.prompt)
     } catch (error) {
       record.status = 'cancelled'
@@ -124,4 +124,21 @@ export class BackgroundSubagents {
       if (now - endedAt >= this.keepFinishedMs) this.records.delete(id)
     }
   }
+}
+
+/**
+ * The text a background subagent reports back: the last assistant message of its Session, without reasoning blocks.
+ * Reading the final message rather than a report keeps the mechanism independent of Ticket reports (a subagent may have
+ * no Ticket at all).
+ */
+export function assistantResult(events: readonly { type: string; data?: unknown }[]): string {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (!event || event.type !== 'assistant/message') continue
+    const data = event.data as { message?: { content?: { type?: string; text?: string }[] } } | undefined
+    const text = (data?.message?.content ?? []).filter(block => block.type === 'text' && typeof block.text === 'string')
+      .map(block => block.text).join('\n').trim()
+    if (text) return text
+  }
+  return ''
 }

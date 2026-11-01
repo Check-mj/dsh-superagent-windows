@@ -18,6 +18,8 @@ export const Config = s.object({
   stateDir: absolute('Directory for the database, locks, worker shims, the agent\'s git configuration and, by default, the ticket directories.').required(),
   // Optional: a JSON file of declarative settings applied at startup, so a team can keep them in version control.
   configPath: s.string().description('Path to a declarative settings file (JSON) applied at startup; omitted blocks keep the stored settings.'),
+  asyncSubagents: s.boolean().default(false)
+    .description('Let a Session start a subagent in the background and keep working while it runs (article §4.1).').volatile(),
   watchdogGuidance: s.string().default('')
     .description('Standing instruction from the operator, sent with every watchdog digest; change it to steer the control loop in words.').volatile(),
   watchdogStallMinutes: s.number().min(1).max(1440).step(1).default(45)
@@ -38,6 +40,8 @@ export interface Machine {
   configPath?: string
   /** Minutes between watchdog digests; 0 keeps the external control loop off. */
   watchdogMinutes: Volatile<number>
+  /** Whether Sessions may start background subagents (article §4.1). */
+  asyncSubagents: Volatile<boolean>
   /** Standing instruction the operator wants repeated in every digest. */
   watchdogGuidance: Volatile<string>
   /** Minutes without progress after which a Ticket counts as stalled. */
@@ -56,9 +60,9 @@ const MOVED: Record<string, string> = {
 export function machineOf(config: DeploymentConfig): Machine {
   const unknown = Object.keys(config).filter(key => !(key in (Config.dict ?? {})))
   if (unknown.length) throw new Error(`dsh-superagent configuration has keys it does not use: ${unknown.map(key => MOVED[key] ? `${key} (now ${MOVED[key]})` : key).join(', ')}; docs/006-deployment.md lists the keys`)
-  const { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, promptMaxChars,
+  const { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, asyncSubagents, promptMaxChars,
     admissionContextMaxPages, admissionContextTimeoutMs } = config
-  return { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, promptMaxChars,
+  return { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, asyncSubagents, promptMaxChars,
     admissionContextMaxPages, admissionContextTimeoutMs }
 }
 

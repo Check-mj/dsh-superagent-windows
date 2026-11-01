@@ -8,7 +8,7 @@
 |---|---|---|
 | **P3 Watchdog 深化（§6）** | ✅ 已实现并真实运行验证 | `src/app/watchdog.ts`、`src/app/runtime.ts`；`tests/watchdog.spec.ts`；`docs/012` §4.1 |
 | **P4 状态存储接缝（§5）** | ✅ 已实现（接口预留，行为零变化） | `src/app/state-store.ts`、`src/app/source-context.ts`；`tests/state-store.spec.ts` |
-| **P1 异步子任务（§4.1 右半边）** | 🟡 生命周核心已实现 + 测试，**未对外暴露** | `src/app/subagents.ts`；`tests/subagents.spec.ts`；`docs/017` P1 |
+| **P1 异步子任务（§4.1 右半边）** | 🟡 已接线（opt-in，默认关闭），真实并发验收待做 | `src/app/subagents.ts`、`src/app/sessions.ts`；`tests/subagents.spec.ts`；`docs/017` P1 |
 | **P2 Router 分片（§2.1）** | ⬜ 未开始 | `docs/017` P2 |
 | 多实例（§8.3，前序工作） | ✅ 服务侧 + 应用侧 + 管理窗口 | `docs/015`、`docs/016` |
 | Watchdog 基础（§6，前序工作） | ✅ | `docs/012` |
