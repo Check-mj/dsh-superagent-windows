@@ -19,11 +19,19 @@ const issues = (error: { issues: readonly { path: PropertyKey[]; message: string
  * GitHub allow list keeps the Feishu part.
  */
 export function mergeDeclarative(current: Settings, declared: unknown): Settings {
-  const parsed = SettingsSchema.partial().safeParse(declared)
+  // Directives start with `$` and are read before validation, because the settings schema is strict and knows
+  // nothing about them. `$prune` names what must disappear: a file that only adds and overrides cannot undo a
+  // Source an earlier file declared, which would leave a stale instance in the stored settings forever.
+  const raw = (declared ?? {}) as Record<string, unknown>
+  const prune = (raw.$prune ?? {}) as { sources?: string[] }
+  const declaredBlocks = Object.fromEntries(Object.entries(raw).filter(([name]) => !name.startsWith('$')))
+  const parsed = SettingsSchema.partial().safeParse(declaredBlocks)
   if (!parsed.success) throw new Error(issues(parsed.error))
   const data = parsed.data as Record<string, unknown>
   const merged = { ...current, ...data } as Settings
-  if (data.sources) merged.sources = { ...current.sources, ...(data.sources as object) } as Settings['sources']
+  const sources = { ...current.sources } as Record<string, unknown>
+  for (const id of prune.sources ?? []) delete sources[id]
+  merged.sources = { ...sources, ...(data.sources as object ?? {}) } as Settings['sources']
   if (data.policy) merged.policy = { ...current.policy, ...(data.policy as object) } as Settings['policy']
   // Parse again so cross-block invariants (a Source kind whose config a Policy part names) are checked once merged.
   return SettingsSchema.parse(merged)

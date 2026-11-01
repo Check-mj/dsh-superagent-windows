@@ -82,3 +82,20 @@
 ## 8. 示例文件
 
 仓库里有一份带占位符的模板：`windows-app/superagent.settings.example.json`。复制它、填好路径与账号，再把 `configPath` 指向你的副本即可。
+
+## 9. `$prune`：删除也需要声明
+
+覆盖只能「增/改」，不能「删」。把某个 Source 从文件里去掉，它会继续留在已存设置里——这一点在真实环境里咬过人：删掉第二个实例后服务一直 `paused`，报 `multipleSourcesUnsupported`。
+
+所以文件支持一个指令（**以 `$` 开头的键在校验前被剥离**，不属于 SettingsSchema）：
+
+```json
+{
+  "$prune": { "sources": ["acme-second"] },
+  "sources": { "github": { "enabled": true, "config": { "...": "..." } } }
+}
+```
+
+- `$prune.sources`：要删除的 Source 实例 id 列表
+- 删除先于合并执行，所以同一份文件里既删又改是确定的
+- 只在启动时生效，与其它块一致

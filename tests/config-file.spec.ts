@@ -53,3 +53,15 @@ it('reports a missing file, bad JSON and schema failures as text instead of thro
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+it('removes what $prune names, so a Source dropped from the file does not linger in the stored settings', () => {
+  const stored = clone(base)
+  stored.sources = {
+    github: { enabled: true, config: {} },
+    stale: { kind: 'github', enabled: true, config: {} },
+  } as typeof stored.sources
+  const declared = { $prune: { sources: ['stale'] }, executor: { ...base.executor, maxWorkers: 2 } }
+  const merged = mergeDeclarative(SettingsSchema.parse(stored), declared)
+  expect(Object.keys(merged.sources)).toEqual(['github'])
+  expect(merged.executor.maxWorkers).toBe(2)
+})
