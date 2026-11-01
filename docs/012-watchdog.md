@@ -49,6 +49,17 @@
 - **不替代 §8.4 的凭据隔离**：它读的是 digest 与本地 API，不接触凭据。
 - **不保证存算分离**：进程整体离线时 Watchdog 也会停（§5 未实现），这类故障仍需外部监督；我们的 `scripts/dsh-superagent status` + 操作系统计划任务可作为更外层的一层。
 
+## 4.1 深化（docs/017 P3）
+
+| 能力 | 做法 | 配置 |
+|---|---|---|
+| **跨 tick 状态差分** | 记下上一次 digest 的 snapshot；只把"变化"当作新闻（暂停状态、负载、健康项进出故障、新出现的停滞、指令变化） | 自动 |
+| **停滞识别** | 有 running/queued Assignment 且 `updatedAt` 超过 `watchdogStallMinutes` 未变 → 该工单标 `STALLED`，即使状态看起来"在跑" | `watchdogStallMinutes`（默认 45） |
+| **健康时零唤醒** | 无变化、无异常 part、无新停滞、无指令变化 → digest 返回空串，循环不投递（不消耗模型回合） | 自动 |
+| **常驻指令通道** | 操作者的自然语言指引随 digest 下发；改配置即改行为（对应文章"通过自然语言指示修改系统行为"） | `watchdogGuidance` |
+
+实测（1 分钟间隔）：健康系统在启动后的最初两次 digest 后**完全静默**——随后 2.1 分钟内新增 0 次投递；指令文本确实出现在 digest 中。
+
 ## 5. 已知限制与后续
 
 1. 目前只有"投 digest"，没有把 Ticket 的 Session 内容自动摘要进 digest（模型需自己读）；后续可把最近几轮的关键事件 Inline 进 digest（与 §3.3 一致）。

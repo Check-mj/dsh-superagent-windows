@@ -19,7 +19,7 @@ import { SourceRegistry } from '../sources/registry.ts'
 import { Commands } from '../infra/commands.ts'
 import type { Deployment, Machine } from '../deployment.ts'
 import { environmentOf, ticketEnvironment, type Variable } from './execution-environment.ts'
-import { WatchdogLoop, assignmentStates, quietMinutes, watchdogDigest, watchdogProblems } from './watchdog.ts'
+import { WatchdogLoop, assignmentStates, quietMinutes, stalledIds, watchdogDigest, watchdogDue, watchdogProblems } from './watchdog.ts'
 import type { SetupProblem } from '../setup.ts'
 import { DshExecutor, sourceTrigger, triggerMessage, workerSessionId } from '../executor/dsh.ts'
 import { ticketCard } from './cards.ts'
@@ -86,6 +86,8 @@ export class Runtime extends Service implements SourceHost {
   /** The Watchdog Session, which the external control loop prompts on a schedule. */
   readonly watchdogId!: string
   private watchdog?: WatchdogLoop
+  /** The snapshot the last digest was built from, so an unchanged system costs no model turn. */
+  private watchdogPrevious?: import('./watchdog.ts').WatchdogSnapshot
   private readonly sourceDeps: SourceContextDeps
   private readonly toolHost: MainToolsHost & ExecutorToolsHost
   /** Non-zero while a main-Session tool is executing an Engine command, suppressing self-triggered domain event notices. */
@@ -272,7 +274,14 @@ export class Runtime extends Service implements SourceHost {
     }
     const loop = new WatchdogLoop({
       everyMinutes: () => this.machine.watchdogMinutes.get(),
-      digest: () => watchdogDigest(this.watchdogSnapshot(), this.machine.watchdogMinutes.get()),
+      digest: () => {
+        const next = this.watchdogSnapshot()
+        // Silence is the point: with nothing changed, nothing unhealthy, no new stall and no standing instruction,
+        // the control loop must not spend a model turn. An empty digest means this tick says nothing.
+        if (!watchdogDue(this.watchdogPrevious, next, this.machine.watchdogStallMinutes.get())) return ''
+        this.watchdogPrevious = next
+        return watchdogDigest(next, this.machine.watchdogMinutes.get())
+      },
       deliver: async text => {
         const settings = this.store.settings()
         await this.sessions.prompt(this.watchdogId, `watchdog-${Date.now()}`, text, 'queue', undefined,
@@ -287,12 +296,16 @@ export class Runtime extends Service implements SourceHost {
   /** What the system believes is happening, as the digest words it. */
   private watchdogSnapshot() {
     const now = Date.now()
-    const tickets = this.store.tickets.open().map(ticket => ({
+    const open = this.store.tickets.open()
+    const tickets = open.map(ticket => ({
       id: ticket.id,
       title: ticket.title,
       states: assignmentStates(ticket),
       quietMinutes: quietMinutes(ticket.updatedAt, now),
+      stalled: false,
     }))
+    const stalled = stalledIds(tickets, this.machine.watchdogStallMinutes.get())
+    for (const ticket of tickets) ticket.stalled = stalled.has(ticket.id)
     return {
       tickets,
       running: tickets.reduce((sum, ticket) => sum + ticket.states.filter(state => state === 'running').length, 0),
@@ -301,6 +314,7 @@ export class Runtime extends Service implements SourceHost {
       problems: watchdogProblems(this.board.all),
       apiBase: `http://127.0.0.1:${process.env.DSH_SUPERAGENT_WATCHDOG_API_PORT ?? 3082}/orchestrator/api`,
       paused: this.store.settings().paused,
+      guidance: this.machine.watchdogGuidance.get(),
     }
   }
   private httpHost(): HttpHost {

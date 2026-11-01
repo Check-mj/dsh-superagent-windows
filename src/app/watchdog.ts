@@ -12,7 +12,7 @@ import type { Ticket } from '../core/index.ts'
 
 export interface WatchdogSnapshot {
   /** Open Tickets with their Assignment states, oldest activity first. */
-  tickets: readonly { id: string; title: string; states: readonly string[]; quietMinutes: number }[]
+  tickets: readonly { id: string; title: string; states: readonly string[]; quietMinutes: number; stalled: boolean }[]
   /** Executor load at the moment of the digest. */
   running: number
   queued: number
@@ -22,6 +22,8 @@ export interface WatchdogSnapshot {
   /** Local management API the Watchdog may call to act, with the header its panel uses. */
   apiBase: string
   paused: boolean
+  /** Standing instruction from the operator, repeated in every digest. */
+  guidance?: string
 }
 
 const minutes = (value: number): string => (value < 1 ? 'under a minute' : `${Math.round(value)} min`)
@@ -46,7 +48,7 @@ export function watchdogDigest(snapshot: WatchdogSnapshot, intervalMinutes: numb
     lines.push('- Open Tickets:')
     for (const ticket of snapshot.tickets) {
       const states = ticket.states.length ? ticket.states.join('/') : 'no Assignment'
-      lines.push(`  - ${ticket.id} "${ticket.title}" — ${states}, quiet for ${minutes(ticket.quietMinutes)}`)
+      lines.push(`  - ${ticket.id} "${ticket.title}" — ${states}, quiet for ${minutes(ticket.quietMinutes)}${ticket.stalled ? ', STALLED' : ''}`)
     }
   }
   if (snapshot.problems.length === 0) {
@@ -54,6 +56,11 @@ export function watchdogDigest(snapshot: WatchdogSnapshot, intervalMinutes: numb
   } else {
     lines.push('- Parts that are not ready:')
     for (const problem of snapshot.problems) lines.push(`  - ${problem.part}: ${problem.state} — ${problem.detail}`)
+  }
+  if (snapshot.guidance) {
+    lines.push('')
+    lines.push('Standing instruction from the operator (follow it over your own judgement when they conflict):')
+    lines.push(snapshot.guidance)
   }
   lines.push('')
   lines.push('Judge, in this order:')
@@ -115,9 +122,34 @@ export class WatchdogLoop {
   async tick(): Promise<void> {
     if (this.host.everyMinutes() <= 0) return
     try {
-      await this.host.deliver(this.host.digest())
+      const text = this.host.digest()
+      if (!text) return
+      await this.host.deliver(text)
     } catch (error) {
       this.host.log(`the watchdog digest could not be delivered: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 }
+
+/** A Ticket counts as stalled once its Assignment states have not changed for `stallMinutes` while it still has work. */
+export const stalledIds = (tickets: WatchdogSnapshot['tickets'], stallMinutes: number): Set<string> =>
+  new Set(tickets.filter(ticket => ticket.states.some(state => state === 'running' || state === 'queued') && ticket.quietMinutes >= stallMinutes)
+    .map(ticket => ticket.id))
+
+/** Whether anything a digest is worth sending for changed since the previous tick. */
+export function watchdogChanged(previous: WatchdogSnapshot | undefined, next: WatchdogSnapshot, stallMinutes: number): boolean {
+  if (!previous) return true
+  if (previous.paused !== next.paused || previous.running !== next.running || previous.queued !== next.queued) return true
+  // A standing instruction is news when it changes, not every tick: repeating it each time would wake the model for free.
+  if ((previous.guidance ?? '') !== (next.guidance ?? '')) return true
+  // A part entering or leaving trouble is always worth a message.
+  const key = (problems: WatchdogSnapshot['problems']) => problems.map(problem => problem.part + ':' + problem.state).join('|')
+  if (key(previous.problems) !== key(next.problems)) return true
+  // A Ticket that just became stalled is news; one that was already stalled and is still stalled is not.
+  const before = new Set(previous.tickets.filter(ticket => ticket.stalled).map(ticket => ticket.id))
+  return next.tickets.some(ticket => ticket.stalled && !before.has(ticket.id))
+}
+
+/** True when a digest has something to say: a change, an unhealthy part, a stall, or operator guidance. */
+export const watchdogDue = (previous: WatchdogSnapshot | undefined, next: WatchdogSnapshot, stallMinutes: number): boolean =>
+  next.problems.length > 0 || watchdogChanged(previous, next, stallMinutes)

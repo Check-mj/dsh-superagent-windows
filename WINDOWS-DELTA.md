@@ -216,4 +216,4 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 | Source 实例命名 kind | `policy.ts` 的 `SourceInstanceSchema.kind`、`sources/registry.ts` | 设置里 Source 的 key 被当作 kind，一个 kind 只能一个实例 | Schema 增加可选 `kind`（缺省=id，旧配置语义不变）；registry 按实例解析 kind；**超过一个 deployment 实例时 setup 明确报错**而非静默用错仓库 | ✅ C1，C2/C3 见 `docs/010` |
 
 两条都要保持：**新增可选字段 + 明确拒绝未支持组合**，这样既向前推进，也不会让运行中的单实例部署悄悄行为改变。
-
+| Watchdog 深化 | `src/app/watchdog.ts`、`src/app/runtime.ts`、`src/deployment.ts` | 跨 tick 差分、停滞识别、空 digest 不投递、`watchdogGuidance` 常驻指令 | 上游若实现 §6 的进展判断，删掉这三个配置项与本模块的差分逻辑即可切回 |

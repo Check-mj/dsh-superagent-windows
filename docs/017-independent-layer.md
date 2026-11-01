@@ -22,7 +22,9 @@
 
 ## 3. 实施顺序与验收
 
-### P1 · 异步子任务（§4.1 缺失的右半边）— 先做
+### P1 · 异步子任务（§4.1 缺失的右半边）— 下一轮
+
+**前置已确认**：`ctx.on('agent/status')` 与 `agent/disposed` 可用于判定子任务结束，因此不依赖上游即可实现。
 
 **做法**（不改上游）：在 bundle 里新增一个插件自带的工具（形如 `subagent_background`），worker/router preset 里可选用。行为：
 
@@ -42,7 +44,7 @@
 
 **验收**：同一 Thread 的 Trigger 永远落到同一分片；分片数变化后旧 Thread 仍可继续；健康里能看到每个分片。
 
-### P3 · Watchdog 深化（§6）
+### P3 · Watchdog 深化（§6）— ✅ 已实现（watchdogStallMinutes / watchdogGuidance / 空 digest 不投递）
 
 **做法**：跨 tick 的**状态差分**（Assignment 状态 + quiet 时间 + 最近事件计数）自动识别"停滞候选"，只在差分异常时才唤醒模型；新增"常驻指令"通道（管理 API 写入一段指引，随 digest 一起下发），对应文章"用自然语言指示修改系统行为"。
 
