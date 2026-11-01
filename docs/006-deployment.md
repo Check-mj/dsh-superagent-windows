@@ -77,7 +77,11 @@ npm install -g @deepseek-ai/dsh@0.2.1-rc.3
 git clone <this repository> dsh-superagent && cd dsh-superagent
 pnpm install && pnpm build
 dsh superagent --from-default-profile web --dump-config > /dev/null
-dsh plugin --profile superagent add "link:$PWD"
+# 安装方式：从构建仓库的 git 源安装（代码来源会显示该仓库）。
+# 需要本地开发循环时改回 link: 指向本机 checkout。
+# 从构建仓库安装（默认）：
+dsh plugin --profile superagent add "git+ssh://git@github.com/Check-mj/dsh-superagent-windows.git#main"
+# 或在本机 checkout 上开发：dsh plugin --profile superagent add "link:$PWD"
 ```
 
 The pinned version above is public; other versions must satisfy `engines.dsh` in `package.json`.

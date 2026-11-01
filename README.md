@@ -19,6 +19,16 @@ dsh-superagent is a proactive coding agent for one GitHub repository, packaged a
 
 It is also a way of working with an agent: **take as little human attention as possible, and give as much value as possible.** An agent that can act for a whole team can also waste a whole team's attention, so it acts only when asked or when a rule the team wrote allows it, and speaks only when someone must act or can use a result. [docs/000-philosophy.md](docs/000-philosophy.md) explains the principle and what it asks of the operator.
 
+## 安装（Windows 适配版的默认方式）
+
+```powershell
+dsh plugin --profile superagent add "git+ssh://git@github.com/Check-mj/dsh-superagent-windows.git#main"
+```
+
+安装后重启 Superagent，侧栏出现 Superagent 面板即可。仓库已包含构建产物（`lib/`），安装时无需再构建。
+桌面应用（打包工具链、多实例、安装器）见 [`windows-app/INSTALL.md`](windows-app/INSTALL.md)。
+想在本机 checkout 上改代码时改用 `link:<checkout>`。
+
 ## Setup
 
 Setup has many steps, so an agent does it with you. Ask your coding agent:

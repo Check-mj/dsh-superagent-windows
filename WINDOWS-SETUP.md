@@ -1,3 +1,8 @@
+#
+# 默认安装方式是从构建仓库的 git 源：
+#   dsh plugin --profile superagent add "git+ssh://git@github.com/Check-mj/dsh-superagent-windows.git#main"
+# 本文的 link: 步骤用于本机 checkout 的开发/调试循环。
+#
 # dsh-superagent Windows 操作手册
 
 > 面向本机操作者（Windows 11 Pro x64，**没有管理员权限**）的完整部署与运维手册。
