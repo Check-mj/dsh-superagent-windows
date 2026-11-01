@@ -13,13 +13,19 @@ export interface SourceContextDeps {
   readonly outbox: Pick<Outbox, 'send'>
   readonly engine: Pick<EngineForSources, 'bindThread' | 'threadClosed'>
   readonly commands: Commands
+  /** Commands scoped to one Source instance (its repository and account), defaulting to the shared one. */
+  commandsFor?(instance?: string): Commands
   readonly sources: SourceRegistry
   /** Throws when accessed before initial setup completes. */
   readonly deployment: Deployment
+  /** The deployment of one Source instance, which is the primary while only one is served. */
+  deploymentFor?(instance?: string): Deployment
   readonly ready: Promise<void>
   configured(): boolean
   /** Setup problem whose `place` matches the Source kind receives it on `context.problem`. */
   readonly setupProblem?: SetupProblem | undefined
+  /** The setup problem recorded for one Source instance. */
+  problemFor?(instance?: string): SetupProblem | undefined
   /** Why setup found no Feishu bot even though the Feishu Source names a CLI. */
   readonly feishuProblem?: SetupProblem | undefined
   /** Hands a Trigger to the Engine and schedules the pass that assesses it. */
@@ -30,18 +36,24 @@ export interface SourceContextDeps {
  * Builds the context for one Source kind. Health reports are restricted to entries declared by the kind and
  * bound to the active registration, becoming no-ops once unregistered.
  */
-export function sourceContextOf(deps: SourceContextDeps, kind: { kind: string; health: readonly string[] }): SourceContext {
+export function sourceContextOf(deps: SourceContextDeps, kind: { kind: string; health: readonly string[] }, instance?: string): SourceContext {
   const { store } = deps
   const health = deps.sources.healthEntries(kind.health)
+  // Every context carries the instance it belongs to, so a deployment, its Commands and its setup problem follow the
+  // instance rather than the process. With one instance the instance is the kind itself and nothing changes.
+  const scope = instance ?? kind.kind
   return {
-    get deployment() { return deps.deployment },
-    commands: deps.commands,
+    get deployment() { return deps.deploymentFor ? deps.deploymentFor(scope) : deps.deployment },
+    commands: deps.commandsFor ? deps.commandsFor(scope) : deps.commands,
     ready: deps.ready,
     configured: () => deps.configured(),
-    get problem() { return [deps.feishuProblem, deps.setupProblem].find(problem => problem?.place === kind.kind) },
+    get problem() {
+      return [deps.feishuProblem, deps.problemFor ? deps.problemFor(scope) : deps.setupProblem]
+        .find(problem => problem?.place === kind.kind)
+    },
     config: <C extends Record<string, unknown>>(id: string) => {
-      const instance = deps.sources.instance<C>(id)
-      return instance?.enabled ? instance.config : undefined
+      const resolved = deps.sources.instance<C>(id === kind.kind ? scope : id)
+      return resolved?.enabled ? resolved.config : undefined
     },
     receive: trigger => deps.receive(trigger),
     atomic: work => store.atomic(work),

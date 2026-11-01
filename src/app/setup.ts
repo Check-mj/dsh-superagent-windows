@@ -23,6 +23,11 @@ export const setupChanged = (before: Settings, after: Settings): boolean => setu
  */
 export class Setup {
   private resolved?: Deployment
+  /** Deployments by Source instance id; the first resolved one is the primary and backs `deployment`. */
+  private readonly deployments = new Map<string, Deployment>()
+  /** Setup problems by Source instance id, so one instance can fail without hiding another's. */
+  private readonly problems = new Map<string, SetupProblem>()
+  private resolvedId?: string
   problem?: SetupProblem
   feishuProblem?: SetupProblem
   /** PATH with the worker shim directory removed so the host's own CLI calls invoke the real binaries. */
@@ -40,13 +45,27 @@ export class Setup {
     if (!this.resolved) throw new Error(`dsh-superagent is waiting for setup: ${this.problem?.detail ?? 'setup has not run'}`)
     return this.resolved
   }
+  /** The deployment of one Source instance, falling back to the primary while only one is served. */
+  deploymentFor(instance?: string): Deployment {
+    const resolved = instance ? this.deployments.get(instance) : undefined
+    return resolved ?? this.deployment
+  }
+  /** The setup problem recorded for one instance, falling back to the primary problem. */
+  problemFor(instance?: string): SetupProblem | undefined {
+    return (instance ? this.problems.get(instance) : undefined) ?? this.problem
+  }
   configured(): boolean { return this.resolved !== undefined }
   /** Resolve deployment accounts and apply the worker environment, recording `SetupError` failures in `problem`/`feishuProblem` and rethrowing unexpected errors. */
   async run(settings: Settings): Promise<boolean> {
-    try { this.resolved = await this.resolve(settings); return true }
-    catch (error) {
+    try {
+      this.resolved = await this.resolve(settings)
+      this.deployments.set(this.resolvedId ?? 'github', this.resolved)
+      this.problems.delete(this.resolvedId ?? 'github')
+      return true
+    } catch (error) {
       if (!(error instanceof SetupError)) throw error
       this.problem = error.problem
+      this.problems.set(this.resolvedId ?? 'github', error.problem)
       return false
     }
   }
@@ -81,6 +100,7 @@ export class Setup {
     const deployments = instancesOf(settings, 'github')
     if (deployments.length > 1) throw new SetupError('multipleSourcesUnsupported', { sources: deployments.join(', ') })
     const [githubId = 'github'] = deployments
+    this.resolvedId = githubId
     const deployment = await resolveDeployment(machine, settings.sources[githubId]?.config, probe)
     const feishu = await resolveFeishuBot(machine, settings.sources.feishu?.config, probe).catch((error: unknown) => {
       if (!(error instanceof SetupError)) throw error
