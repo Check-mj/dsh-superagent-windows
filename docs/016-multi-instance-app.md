@@ -90,8 +90,22 @@ set "GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\<instance>\gh-config"
 - 检测到 `Superagent` 进程就直接拒绝并提示"关闭窗口后重跑"（退出码 2）
 - robocopy 改为 `/R:2 /W:2`（最多重试 2 次）
 
-## 7. 尚未做
+## 7. 应用内实例管理窗口
 
-1. 应用内**GUI** 的实例列表（现在的"管理面"是 `instances.ps1` + 每实例快捷方式；窗口本身仍是单实例视图）
-2. 实例级总览（跨实例健康/Watchdog 汇总）：需要实例之外的观察者
-3. 端口分配仍交给 DSH 的 `--patch` overlay（已默认 `0`），未做显式冲突检测
+**文件 → 实例…** 打开一个管理窗口，列出 `<安装>\config\instances.json` 里的每个实例（标签、名称、状态目录），每行一个「打开」按钮：点击即用同一可执行文件 `--instance <name>` 启动该边界的窗口。
+
+命令行等价物（便于脚本与验证）：
+
+```powershell
+Superagent.exe --list-instances   # 打印实例记录（JSON）后退出，不开窗口
+Superagent.exe --manage           # 直接打开管理窗口
+```
+
+实测：`--list-instances` 打印出两条记录（含 `ghConfigFrom`）；`--manage` 启动后日志出现 `[instances] window ready: Superagent 实例`，窗口枚举也确认该窗口可见。管理窗口内的按钮点击属于 GUI 交互，本会话无法模拟，已在下节标注。
+
+## 8. 尚未做
+
+1. 实例级总览（跨实例健康/Watchdog 汇总）：需要实例之外的观察者
+2. 端口分配仍交给 DSH 的 `--patch` overlay（已默认 `0`），未做显式冲突检测
+3. 管理窗口的按钮点击未经真实鼠标验证（数据通路已用 `--list-instances` 验证）
+4. DSH **workspace 列表是跨实例共享的**（存在 `~/.dsh` 而非 `stateDir`），所以侧栏会看到别的实例创建的 workspace；这不影响状态隔离，但界面观感需要后续收敛

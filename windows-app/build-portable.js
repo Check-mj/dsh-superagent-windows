@@ -19,7 +19,7 @@ const ROOT = __dirname;
 const OUT = path.join(ROOT, 'Superagent');
 const DIST = path.join(ROOT, 'node_modules', 'electron', 'dist');
 
-const APP_FILES = ['package.json', 'main.js', 'icon.png', 'icon.ico'];
+const APP_FILES = ['package.json', 'main.js', 'instances-window.js', 'icon.png', 'icon.ico'];
 
 function die(msg) {
   console.error('BUILD FAILED: ' + msg);

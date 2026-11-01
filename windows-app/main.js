@@ -17,7 +17,7 @@
  *        <userData>/backend.log  raw backend stdout/stderr
  * State: <userData>/window-state.json, <userData>/runtime.patch.yml
  */
-const { app, BrowserWindow, Menu, shell, screen } = require('electron');
+const { app, BrowserWindow, Menu, shell, screen, ipcMain } = require('electron');
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -124,6 +124,7 @@ function resolveUserData() {
   return { dir: candidates[candidates.length - 1], writable: false };
 }
 
+const instancesUi = require('./instances-window.js')({ BrowserWindow, ipcMain, spawn, fs, path, log });
 const USER_DATA_INFO = resolveUserData();
 const USER_DATA = USER_DATA_INFO.dir;
 try { app.setPath('userData', USER_DATA); } catch { /* keep default */ }
@@ -975,6 +976,8 @@ function buildMenu() {
     {
       label: '文件',
       submenu: [
+        { label: '实例…', click: () => instancesUi.openInstancesWindow() },
+        { type: 'separator' },
         { label: '重启后端', accelerator: 'CmdOrCtrl+Shift+R', click: () => restartBackend() },
         { type: 'separator' },
         { label: '打开日志文件夹', click: () => shell.openPath(USER_DATA).catch(() => {}) },
@@ -1053,6 +1056,14 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    // Headless verification path: print the instance records and exit without a window.
+    if (process.argv.includes('--list-instances')) {
+      const records = instancesUi.listInstances();
+      console.log(JSON.stringify(records, null, 2));
+      try { fs.writeFileSync(path.join(app.getPath('temp'), 'superagent-instances.json'), JSON.stringify(records, null, 2)); } catch (e) { /* reporting only */ }
+      app.quit();
+      return;
+    }
     log(`[app] starting ${app.getVersion()} | Electron ${process.versions.electron} | electron=${process.execPath}`);
     if (INSTANCE) log('[instance] ' + INSTANCE + ' | profile=' + PROFILE + ' | stateDir=' + String(INSTANCE_STATE_DIR || '(profile)') + ' | port=' + REQUESTED_PORT);
     log('[app] userData: ' + USER_DATA + (USER_DATA_INFO.writable ? '' : ' (WARNING: not writable)'));
@@ -1063,6 +1074,7 @@ if (!gotLock) {
     buildMenu();
     seedInstanceCredentials(INSTANCE_RECORD);
     startBackend();
+    if (process.argv.includes('--manage')) setTimeout(() => instancesUi.openInstancesWindow(), 600);
   });
 
   app.on('window-all-closed', () => {
