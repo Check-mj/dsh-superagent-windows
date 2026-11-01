@@ -18,14 +18,6 @@ export const Config = s.object({
   stateDir: absolute('Directory for the database, locks, worker shims, the agent\'s git configuration and, by default, the ticket directories.').required(),
   // Optional: a JSON file of declarative settings applied at startup, so a team can keep them in version control.
   configPath: s.string().description('Path to a declarative settings file (JSON) applied at startup; omitted blocks keep the stored settings.'),
-  routerShards: s.number().min(1).max(8).step(1).default(1)
-    .description('Router Sessions to spread Triggers over, by Thread (article §2.1); 1 keeps the single Router.').volatile(),
-  watchdogGuidance: s.string().default('')
-    .description('Standing instruction from the operator, sent with every watchdog digest; change it to steer the control loop in words.').volatile(),
-  watchdogStallMinutes: s.number().min(1).max(1440).step(1).default(45)
-    .description('Minutes without an Assignment state change after which a Ticket counts as stalled in the digest.').volatile(),
-  watchdogMinutes: s.number().min(0).max(1440).step(1).default(30)
-    .description('Minutes between watchdog digests; 0 turns the external control loop off.').volatile(),
   promptMaxChars: s.number().min(LIMITS.promptMaxChars.min).max(LIMITS.promptMaxChars.max).step(1).default(100000)
     .description('Largest saved prompt configuration, in characters.').volatile(),
   admissionContextMaxPages: s.number().min(LIMITS.admissionContextMaxPages.min).max(LIMITS.admissionContextMaxPages.max).step(1).default(10)
@@ -38,14 +30,6 @@ export interface Machine {
   stateDir: string
   /** Declarative settings file applied at startup, when the deployment names one. */
   configPath?: string
-  /** Minutes between watchdog digests; 0 keeps the external control loop off. */
-  watchdogMinutes: Volatile<number>
-  /** How many Router Sessions Triggers spread over (article §2.1); 1 is the single Router. */
-  routerShards: Volatile<number>
-  /** Standing instruction the operator wants repeated in every digest. */
-  watchdogGuidance: Volatile<string>
-  /** Minutes without progress after which a Ticket counts as stalled. */
-  watchdogStallMinutes: Volatile<number>
   promptMaxChars: Volatile<number>
   admissionContextMaxPages: Volatile<number>
   admissionContextTimeoutMs: Volatile<number>
@@ -54,16 +38,16 @@ const MOVED: Record<string, string> = {
   repository: 'on the GitHub Source', branchPrefix: 'in the prepare command of the Execution settings', github: 'on the GitHub Source',
   feishu: 'on the Feishu Source', author: 'prompt text', repositoryPath: 'in the prepare command of the Execution settings',
   worktreeRoot: 'the ticket directory of the Execution settings', blockedCommands: 'in the Execution settings',
+  watchdogMinutes: 'in the Execution settings (control loop)', watchdogStallMinutes: 'in the Execution settings (control loop)',
+  watchdogGuidance: 'in the Execution settings (control loop)', routerShards: 'in the Execution settings (Router shards)',
 }
 
 /** Read machine settings and reject unknown configuration keys (naming where deprecated keys moved). */
 export function machineOf(config: DeploymentConfig): Machine {
   const unknown = Object.keys(config).filter(key => !(key in (Config.dict ?? {})))
   if (unknown.length) throw new Error(`dsh-superagent configuration has keys it does not use: ${unknown.map(key => MOVED[key] ? `${key} (now ${MOVED[key]})` : key).join(', ')}; docs/006-deployment.md lists the keys`)
-  const { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, routerShards,
-    promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs } = config
-  return { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, routerShards,
-    promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs }
+  const { stateDir, configPath, promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs } = config
+  return { stateDir, configPath, promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs }
 }
 
 export const GithubAccountsSchema = z.object({

@@ -119,7 +119,7 @@ export class Runtime extends Service implements SourceHost {
       const prompts = this.prompts = new Prompts(store, () => machine.promptMaxChars.get(), deployed, feishu)
       const masterId = this.masterId = store.get(KV.runtime.masterId) ?? `orchestrator-${key(machine.stateDir)}`
       // Router Sessions: the master, plus one per shard when the operator asked for sharding (article §2.1).
-      this.routerIdsValue = shardSessionIds(masterId, machine.routerShards.get())
+      this.routerIdsValue = shardSessionIds(masterId, store.settings().executor.routerShards)
       // A Session of its own, outside the Router: the external control loop of the official design (article §6).
       this.watchdogId = `watchdog-${key(machine.stateDir)}`
       store.set(KV.runtime.masterId, masterId)
@@ -307,7 +307,7 @@ export class Runtime extends Service implements SourceHost {
    * takes no work, and cannot answer people — it only observes and intervenes.
    */
   private async startWatchdog(): Promise<void> {
-    const minutes = this.machine.watchdogMinutes.get()
+    const minutes = this.store.settings().executor.watchdogMinutes
     if (minutes <= 0) return
     try {
       await this.sessions.ensure(this.watchdogId, this.machine.stateDir, 'dsh-superagent watchdog', 'worker')
@@ -316,14 +316,15 @@ export class Runtime extends Service implements SourceHost {
       return
     }
     const loop = new WatchdogLoop({
-      everyMinutes: () => this.machine.watchdogMinutes.get(),
+      everyMinutes: () => this.store.settings().executor.watchdogMinutes,
       digest: () => {
         const next = this.watchdogSnapshot()
         // Silence is the point: with nothing changed, nothing unhealthy, no new stall and no standing instruction,
         // the control loop must not spend a model turn. An empty digest means this tick says nothing.
-        if (!watchdogDue(this.watchdogPrevious, next, this.machine.watchdogStallMinutes.get())) return ''
+        const executor = this.store.settings().executor
+        if (!watchdogDue(this.watchdogPrevious, next, executor.watchdogStallMinutes)) return ''
         this.watchdogPrevious = next
-        return watchdogDigest(next, this.machine.watchdogMinutes.get())
+        return watchdogDigest(next, executor.watchdogMinutes)
       },
       deliver: async text => {
         const settings = this.store.settings()
@@ -347,7 +348,7 @@ export class Runtime extends Service implements SourceHost {
       quietMinutes: quietMinutes(ticket.updatedAt, now),
       stalled: false,
     }))
-    const stalled = stalledIds(tickets, this.machine.watchdogStallMinutes.get())
+    const stalled = stalledIds(tickets, this.store.settings().executor.watchdogStallMinutes)
     for (const ticket of tickets) ticket.stalled = stalled.has(ticket.id)
     return {
       tickets,
@@ -357,7 +358,7 @@ export class Runtime extends Service implements SourceHost {
       problems: watchdogProblems(this.board.all),
       apiBase: `http://127.0.0.1:${process.env.DSH_SUPERAGENT_WATCHDOG_API_PORT ?? 3082}/orchestrator/api`,
       paused: this.store.settings().paused,
-      guidance: this.machine.watchdogGuidance.get(),
+      guidance: this.store.settings().executor.watchdogGuidance,
     }
   }
   private httpHost(): HttpHost {

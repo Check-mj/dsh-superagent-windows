@@ -68,7 +68,7 @@ standard 的全套工具（含 `edit`、`subagent`）留在那里，既没有我
 
 ### P2 · Router 分片（§2.1 未实现的扩容路径）— 放置与预置已完成，分发待接线
 
-**做法**：`routerShards: N` 配置。按 `threadKey` 哈希把 Trigger 分给 N 个 Router Session；全局记忆仍在 Router 层（文章说分片会削弱连续性，所以用 Thread 亲和性把同一 Thread 固定到一个分片，避免跨分片上下文断裂）。
+**做法**：设置里的 `routerShards`（执行设置 → 控制回路；默认 1，**改后需重启生效**）。按 `threadKey` 哈希把 Trigger 分给 N 个 Router Session；全局记忆仍在 Router 层（文章说分片会削弱连续性，所以用 Thread 亲和性把同一 Thread 固定到一个分片，避免跨分片上下文断裂）。
 
 **进度**：①放置规则 `src/app/shards.ts`（FNV-1a，Thread 亲和性，4 个测试）✅；②分片 Session 预置与
 Router 待遇（`SocketHost.routerIds()`、`decorate` 对每个 Router 生效、`router` 健康项）✅，实测

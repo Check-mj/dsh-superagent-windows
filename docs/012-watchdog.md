@@ -25,12 +25,15 @@
 
 配置项（`Machine`）：
 
-```yaml
-- id: dsh-superagent
-  config:
-    stateDir: C:/Users/<you>/.dsh/state/superagent
-    watchdogMinutes: 30   # 0 关闭；默认 30
-```
+这些参数现在都在 **设置 → 执行（Execution settings）→ 控制回路（Watchdog）** 里（见 `docs/009`），不再写在机器配置里；机器配置只保留启动接线（`stateDir`、`configPath`）。
+
+| 设置项 | 默认 | 含义 |
+|---|---|---|
+| `watchdogMinutes` | 30 | 摘要间隔（分钟）；0 关闭控制回路 |
+| `watchdogStallMinutes` | 45 | 停滞判定阈值（分钟） |
+| `watchdogGuidance` | 空 | 常驻指令，随摘要下发 |
+
+同区块里还有 `routerShards`（Router 分片数，默认 1，**改后需重启生效**）。
 
 ## 3. Digest 写了什么
 

@@ -38,7 +38,6 @@
      config:
        stateDir: C:/Users/<you>/.dsh/state/team-b
        configPath: C:/Users/<you>/AppData/Local/Programs/Superagent/config/team-b.settings.json
-       watchdogMinutes: 30
    ```
 
 3. **跑起来**：

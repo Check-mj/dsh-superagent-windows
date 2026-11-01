@@ -94,6 +94,12 @@ export const ExecutorConfigSchema = z.object({
   directory: z.string().trim().refine(path => path === '' || path.startsWith('/'), 'An absolute path, or empty for <stateDir>/work').default(''),
   prepare: z.string().max(LIMITS.prepareCommand).default(''),
   blockedCommands: z.array(CommandNameSchema).default([]),
+  // The external control loop (article §6) and Router sharding (article §2.1) are runtime policy a person tunes here;
+  // the machine config keeps only startup wiring (state directory, declarative settings path).
+  watchdogMinutes: z.number().int().min(0).max(1440).default(30),
+  watchdogStallMinutes: z.number().int().min(1).max(1440).default(45),
+  watchdogGuidance: z.string().max(2000).default(''),
+  routerShards: z.number().int().min(1).max(8).default(1),
 }).strict()
 /** Which kind a stored instance belongs to: its `kind` field, or its id when it does not name one. */
 export const sourceKindOf = (id: string, stored?: { kind?: string }): string => stored?.kind ?? id

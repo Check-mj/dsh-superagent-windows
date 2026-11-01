@@ -99,3 +99,18 @@
 - `$prune.sources`：要删除的 Source 实例 id 列表
 - 删除先于合并执行，所以同一份文件里既删又改是确定的
 - 只在启动时生效，与其它块一致
+
+## 执行块新增的运行时段落
+
+`executor` 块现在也承载运行时可调的控制项（面板「执行」页里可改，同样可用本文件的声明式配置覆盖）：
+
+```json
+{ "executor": { "watchdogMinutes": 30, "watchdogStallMinutes": 45, "watchdogGuidance": "", "routerShards": 1 } }
+```
+
+- `watchdogMinutes`：外部控制回路摘要间隔（0 关闭，默认 30）
+- `watchdogStallMinutes`：停滞判定阈值（默认 45）
+- `watchdogGuidance`：常驻指令，随摘要下发给 Watchdog
+- `routerShards`：Router 分片数（默认 1；**改后需重启**，分片会话在启动时解析）
+
+机器配置（`cordis.patch.yml`）只保留启动接线：`stateDir` 与 `configPath`。把旧键写回机器配置会得到一条明确的报错，提示已移到 Execution settings。
