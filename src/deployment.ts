@@ -18,6 +18,8 @@ export const Config = s.object({
   stateDir: absolute('Directory for the database, locks, worker shims, the agent\'s git configuration and, by default, the ticket directories.').required(),
   // Optional: a JSON file of declarative settings applied at startup, so a team can keep them in version control.
   configPath: s.string().description('Path to a declarative settings file (JSON) applied at startup; omitted blocks keep the stored settings.'),
+  routerShards: s.number().min(1).max(8).step(1).default(1)
+    .description('Router Sessions to spread Triggers over, by Thread (article §2.1); 1 keeps the single Router.').volatile(),
   asyncSubagents: s.boolean().default(false)
     .description('Let a Session start a subagent in the background and keep working while it runs (article §4.1).').volatile(),
   watchdogGuidance: s.string().default('')
@@ -40,6 +42,8 @@ export interface Machine {
   configPath?: string
   /** Minutes between watchdog digests; 0 keeps the external control loop off. */
   watchdogMinutes: Volatile<number>
+  /** How many Router Sessions Triggers spread over (article §2.1); 1 is the single Router. */
+  routerShards: Volatile<number>
   /** Whether Sessions may start background subagents (article §4.1). */
   asyncSubagents: Volatile<boolean>
   /** Standing instruction the operator wants repeated in every digest. */
@@ -60,10 +64,10 @@ const MOVED: Record<string, string> = {
 export function machineOf(config: DeploymentConfig): Machine {
   const unknown = Object.keys(config).filter(key => !(key in (Config.dict ?? {})))
   if (unknown.length) throw new Error(`dsh-superagent configuration has keys it does not use: ${unknown.map(key => MOVED[key] ? `${key} (now ${MOVED[key]})` : key).join(', ')}; docs/006-deployment.md lists the keys`)
-  const { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, asyncSubagents, promptMaxChars,
-    admissionContextMaxPages, admissionContextTimeoutMs } = config
-  return { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, asyncSubagents, promptMaxChars,
-    admissionContextMaxPages, admissionContextTimeoutMs }
+  const { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, routerShards, asyncSubagents,
+    promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs } = config
+  return { stateDir, configPath, watchdogMinutes, watchdogGuidance, watchdogStallMinutes, routerShards, asyncSubagents,
+    promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs }
 }
 
 export const GithubAccountsSchema = z.object({
