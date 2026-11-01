@@ -556,6 +556,7 @@ const SHELL_CSS = `
   a { color: #7c9cff; text-decoration: none; }
   a:hover { text-decoration: underline; }
   .btns { margin-top: 16px; display: flex; gap: 10px; }
+  .btns button { background: #2f6fdd; color: #fff; border: 0; border-radius: 7px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
 `;
 
 function splashHtml(message, note) {
@@ -597,6 +598,7 @@ function errorHtml(title, detail, extra, logPath) {
   </div>
   <div class="meta">日志：<b>${escapeHtml(logPath)}</b></div>
   <div class="btns">
+    <button class="primary" onclick="window.dshShell && window.dshShell.restartBackend()">重新启动后端</button>
     <a href="${escapeHtml('file:///' + logPath.replace(/\\/g, '/'))}" target="_blank">打开应用日志</a>
     <a href="${escapeHtml('file:///' + BACKEND_LOG.replace(/\\/g, '/'))}" target="_blank">打开后端日志</a>
   </div>
@@ -688,6 +690,8 @@ function extraWithHint(base) {
 
 function startBackend() {
   if (state.quitting) return;
+  // A window closed while its backend kept running leaves the state lock held; clear that orphan first.
+  cleanupOrphanBackends();
   state.integrity = detectIntegrityLevel();
   log('[preflight] integrity level: ' + state.integrity);
   const tools = resolveCliTools();
@@ -782,6 +786,7 @@ function startBackend() {
     state.ready = true;
     clearTimeout(state.timer);
     log('[ready] backend URL: ' + url + ' (' + (Date.now() - state.startedAt) + 'ms)');
+    startHealthWatch();
     if (state.win && !state.win.isDestroyed()) {
       state.win.loadURL(url).catch((e) => log('[ready] loadURL failed: ' + e.message));
     }
@@ -800,10 +805,147 @@ function killTree(pid) {
   }
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Backend watchdog: notice a dead backend and offer a restart button   */
+/* ------------------------------------------------------------------ */
+
+/** One HTTP GET with a short timeout; resolves true when the backend answers. */
+function probe(url, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (value) => { if (done) return; done = true; resolve(value) };
+    try {
+      const client = url.startsWith('https:') ? require('https') : require('http');
+      const request = client.get(url, { timeout: timeoutMs, headers: { 'x-orchestrator-request': '1' } }, (response) => {
+        response.resume();
+        finish(response.statusCode < 500);
+      });
+      request.on('timeout', () => { request.destroy(); finish(false) });
+      request.on('error', () => finish(false));
+    } catch (error) { finish(false) }
+    setTimeout(() => finish(false), timeoutMs + 500);
+  });
+}
+
+/**
+ * Polls the backend while the window is open. When it stops answering twice in a row the shell takes over with a
+ * local page that names the problem, shows the tail of the log, and offers to restart the backend — the panel itself
+ * cannot, because the panel is served by the process that just died.
+ */
+function startHealthWatch() {
+  clearInterval(state.healthTimer);
+  state.healthFailures = 0;
+  state.healthTimer = setInterval(() => { void healthTick() }, 5000);
+}
+
+async function healthTick() {
+  if (!state.ready || !state.url || state.restarting || state.quitting) return;
+  const alive = await probe(state.url + '/orchestrator/api/state', 4000);
+  if (alive) {
+    state.healthFailures = 0;
+    if (state.downWin && !state.downWin.isDestroyed()) { closeBackendDown(); reloadMainWindow() }
+    return;
+  }
+  state.healthFailures += 1;
+  log('[health] backend did not answer (' + state.healthFailures + ')' );
+  if (state.healthFailures >= 2) showBackendDown();
+}
+
+/** The last lines of the backend log, which usually name the reason. */
+function backendLogTail(lines = 12) {
+  try {
+    const text = fs.readFileSync(APP_LOG, 'utf8').split('\n').filter(Boolean);
+    return text.slice(-lines).join('\n');
+  } catch (error) { return '(无法读取日志: ' + error.message + ')' }
+}
+
+function closeBackendDown() {
+  if (state.downWin && !state.downWin.isDestroyed()) state.downWin.close();
+  state.downWin = null;
+}
+
+function reloadMainWindow() {
+  if (!state.url || !state.win || state.win.isDestroyed()) return;
+  state.win.loadURL(state.url).catch((error) => log('[health] reload failed: ' + error.message));
+}
+
+function showBackendDown() {
+  const detail = state.url ? ('目标: ' + state.url) : '后端从未报告地址';
+  const tail = backendLogTail();
+  if (state.downWin && !state.downWin.isDestroyed()) {
+    state.downWin.loadURL(dataUrl(backendDownHtml(detail, tail))).catch(() => {});
+    return;
+  }
+  log('[health] opening the backend-down page');
+  state.downWin = new BrowserWindow({
+    width: 760, height: 520, title: 'DSH-Superagent — 后端没有响应', autoHideMenuBar: true, alwaysOnTop: true,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  });
+  state.downWin.on('closed', () => { state.downWin = null; });
+  state.downWin.loadURL(dataUrl(backendDownHtml(detail, tail))).catch(() => {});
+}
+
+function backendDownHtml(detail, tail) {
+  const esc = (value) => String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>DSH-Superagent — 后端没有响应</title><style>' +
+    ':root{color-scheme:dark}body{margin:0;background:#151517;color:#e8e8ea;font:13.5px/1.7 "Segoe UI","Microsoft YaHei",sans-serif}' +
+    '.card{max-width:660px;margin:48px auto;padding:0 25px}h1{font-size:18px;margin:0 0 6px}.sub{color:#8b8b94;font-size:12.5px}' +
+    '.err{margin-top:16px;padding:10px 12px;border-left:3px solid #e2534b;background:#241a1a;border-radius:6px}' +
+    'pre{margin-top:14px;padding:12px;background:#1d1d21;border:1px solid #2e2e34;border-radius:8px;max-height:150px;overflow:auto;font:12px/1.5 Consolas,monospace;white-space:pre-wrap;word-break:break-all}' +
+    '.btns{display:flex;gap:10px;margin-top:18px}button{border:0;border-radius:7px;padding:9px 16px;font-size:13px;cursor:pointer}' +
+    '.primary{background:#2f6fdd;color:#fff}.secondary{background:#2a2a2f;color:#d7d7dd}' +
+    '</style></head><body><div class="card"><h1>后端服务没有响应</h1>' +
+    '<div class="sub">面板由后端进程提供，它已经不在了，所以这个按钮由外壳提供。重启通常几秒内完成；日志里通常写着原因。</div>' +
+    '<div class="err">' + esc(detail) + '</div>' +
+    '<pre>' + esc(tail) + '</pre>' +
+    '<div class="btns"><button class="primary" id="restart">重新启动后端</button>' +
+    '<button class="secondary" id="logs">打开日志文件夹</button>' +
+    '<button class="secondary" id="quit">退出</button></div></div>' +
+    '<script>const {ipcRenderer}=require("electron");' +
+    'document.getElementById("restart").onclick=()=>{document.getElementById("restart").textContent="正在重启…";ipcRenderer.send("backend:restart")};' +
+    'document.getElementById("logs").onclick=()=>ipcRenderer.send("backend:logs");' +
+    'document.getElementById("quit").onclick=()=>ipcRenderer.send("backend:quit");' +
+    '</script></body></html>';
+}
+
+/** Restart requested from the backend-down page: stop what is left, clear orphans, start again. */
+async function restartFromDown() {
+  log('[health] restart requested from the backend-down page');
+  closeBackendDown();
+  await stopBackend();
+  cleanupOrphanBackends();
+  showSplash('正在重启后端…');
+  startBackend();
+}
+
+/**
+ * Kill node processes left over from an earlier window that still hold this instance's runtime overlay (and with it
+ * the state lock). Only processes whose command line names our own overlay path are touched, so another instance or
+ * another profile is never the target.
+ */
+function cleanupOrphanBackends() {
+  try {
+    const marker = path.join(USER_DATA, 'runtime.patch.yml');
+    // PowerShell single-quoted strings need doubled single quotes; the path itself is literal there.
+    const script = "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -like '*" +
+      marker.replace(/'/g, "''") + "*' -and $_.ProcessId -ne " + (state.child ? state.child.pid : 0) +
+      " } | ForEach-Object { $_.ProcessId }"
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 8000, windowsHide: true });
+    const pids = String(result.stdout ?? '').split(/\s+/).filter((value) => /^\d+$/.test(value));
+    for (const pid of pids) {
+      log('[health] stopping orphan backend pid ' + pid);
+      spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Stop-Process -Id ' + pid + ' -Force -ErrorAction SilentlyContinue'], { timeout: 5000, windowsHide: true });
+    }
+    if (!pids.length) log('[health] no orphan backend found');
+  } catch (error) { log('[health] orphan cleanup failed: ' + error.message); }
+}
 function stopBackend() {
   return new Promise((resolve) => {
     const child = state.child;
     clearTimeout(state.timer);
+    clearInterval(state.healthTimer);
+    state.healthFailures = 0;
     state.ready = false;
     state.url = null;
     if (!child || child.exitCode !== null || child.signalCode) {
@@ -912,6 +1054,8 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       spellcheck: false,
+      // Local pages (splash, startup failure) need two actions from the main process; nothing else is exposed.
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
   state.win = win;
@@ -972,6 +1116,9 @@ function createWindow() {
   return win;
 }
 
+ipcMain.on('backend:restart', () => { void restartFromDown(); });
+ipcMain.on('backend:logs', () => { shell.openPath(USER_DATA).catch(() => {}); });
+ipcMain.on('backend:quit', () => app.quit());
 function buildMenu() {
   const template = [
     {
