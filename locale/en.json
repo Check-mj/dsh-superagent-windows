@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "DSH-Superagent",
-    "description": "Windows adaptation of the official dsh-superagent prototype (MIT · © 2026 DeepSeek Harness Team): watch one GitHub repository, turn authorized requests into Tickets and execute each in its own DSH Session. Upstream: https://github.com/deepseek-ai/dsh-superagent-prototype ; this build: https://github.com/Check-mj/dsh-superagent-windows"
+    "description": "DSH-Superagent — the Windows deep adaptation of dsh super agent (a fork of the official dsh-superagent-prototype, not an official product). It turns a GitHub repository (issues, pull requests, comments, CI) and optional Feishu chats into a continuous event source: authorized requests become Tickets, each runs in its own isolated DSH Session, and the result is replied where the request came from. The panel supervises triggers, evaluation, execution and settings; the desktop app adds one-line install, multi-instance and self-recovery; and the adaptation implements the Watchdog control loop and Router sharding the article describes but upstream does not ship. Upstream: https://github.com/deepseek-ai/dsh-superagent-prototype (MIT, Copyright (c) 2026 DeepSeek Harness Team); this build: https://github.com/Check-mj/dsh-superagent-windows"
   }
 }

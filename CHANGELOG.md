@@ -40,6 +40,14 @@ First publishable Windows adaptation.
 - Attribution is explicit in README, `NOTICE`, `LICENSE` and the plugin page's locale description: upstream is the
   official DeepSeek prototype (MIT, © 2026 DeepSeek Harness Team), and this fork deletes its own version of a
   mechanism once upstream ships one.
+### Changed
+
+- The product description was rewritten everywhere it is read (repository About, plugin page metadata, README
+  positioning, package description): it no longer reads as "watches one repository" but covers the whole chain —
+  event sources (GitHub issues/PRs/comments/CI and optional Feishu), two-level judgement, isolated executions with
+  replies, the panel, multi-instance, the Watchdog control loop and Router sharding, plus the desktop install and
+  self-recovery story.
+
 
 ### Fixed
 - The installer no longer hangs when the application is running (it refuses, and robocopy retries are bounded).
