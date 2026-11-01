@@ -41,6 +41,9 @@ export const triggerSessionId = (input: { thread?: string }, base: string, count
 /** How the Triggers of one sample spread over `count` shards: used by tests and by health. */
 export const shardLoads = (threadKeys: readonly string[], count: number): number[] => {
   const loads = Array.from({ length: Math.max(1, Math.floor(count)) }, () => 0)
-  for (const key of threadKeys) loads[shardOf(key, loads.length)] += 1
+  for (const key of threadKeys) {
+    const index = shardOf(key, loads.length)
+    loads[index] = (loads[index] ?? 0) + 1
+  }
   return loads
 }
