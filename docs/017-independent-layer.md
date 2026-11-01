@@ -50,10 +50,14 @@
 - 单测：调用返回 Started 而非结果；完成后父 Session 收到一条消息；cancel 后不再投递。
 - 真跑：worker Session 里发起一个慢子任务，期间仍能响应新消息（这是文章 §4.1 的核心断言）。
 
-### P2 · Router 分片（§2.1 未实现的扩容路径）— 可选开启
+### P2 · Router 分片（§2.1 未实现的扩容路径）— 放置与预置已完成，分发待接线
 
 **做法**：`routerShards: N` 配置。按 `threadKey` 哈希把 Trigger 分给 N 个 Router Session；全局记忆仍在 Router 层（文章说分片会削弱连续性，所以用 Thread 亲和性把同一 Thread 固定到一个分片，避免跨分片上下文断裂）。
 
+**进度**：①放置规则 `src/app/shards.ts`（FNV-1a，Thread 亲和性，4 个测试）✅；②分片 Session 预置与
+Router 待遇（`SocketHost.routerIds()`、`decorate` 对每个 Router 生效、`router` 健康项）✅，实测
+`routerShards: 2` 时健康显示 `2 Router Sessions (sharded by Thread)` 且磁盘上出现 `orchestrator-…-shard-1`。
+**待接线**：Trigger 分发放到 `triggerSessionId(thread)`（当前所有 Trigger 仍进主 Router）。
 **验收**：同一 Thread 的 Trigger 永远落到同一分片；分片数变化后旧 Thread 仍可继续；健康里能看到每个分片。
 
 ### P3 · Watchdog 深化（§6）— ✅ 已实现（watchdogStallMinutes / watchdogGuidance / 空 digest 不投递）

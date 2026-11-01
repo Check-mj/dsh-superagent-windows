@@ -218,3 +218,4 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 两条都要保持：**新增可选字段 + 明确拒绝未支持组合**，这样既向前推进，也不会让运行中的单实例部署悄悄行为改变。
 | Watchdog 深化 | `src/app/watchdog.ts`、`src/app/runtime.ts`、`src/deployment.ts` | 跨 tick 差分、停滞识别、空 digest 不投递、`watchdogGuidance` 常驻指令 | 上游若实现 §6 的进展判断，删掉这三个配置项与本模块的差分逻辑即可切回 |
 | 异步子任务（§4.1 右半边） | `src/app/subagents.ts` | 后台子任务生命周期：Started 立即返回、结果以事件消息回投父会话、cancel、Spill | 上游 `dsh-tool-subagent` 开放后台模式后，删掉本模块与工具、切回上游 |
+| Router 分片（§2.1） | `src/app/shards.ts`、`src/app/sessions.ts`、`src/app/runtime.ts` | `routerShards`（默认 1）、按 Thread 的稳定放置、分片 Session 预置、`router` 健康项 | 上游若实现 Router 分片，删掉本模块与配置、切回 |

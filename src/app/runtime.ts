@@ -20,6 +20,7 @@ import { Commands } from '../infra/commands.ts'
 import type { Deployment, Machine } from '../deployment.ts'
 import { environmentOf, ticketEnvironment, type Variable } from './execution-environment.ts'
 import { WatchdogLoop, assignmentStates, quietMinutes, stalledIds, watchdogDigest, watchdogDue, watchdogProblems } from './watchdog.ts'
+import { shardSessionIds } from './shards.ts'
 import type { SetupProblem } from '../setup.ts'
 import { DshExecutor, sourceTrigger, triggerMessage, workerSessionId } from '../executor/dsh.ts'
 import { ticketCard } from './cards.ts'
@@ -83,6 +84,10 @@ export class Runtime extends Service implements SourceHost {
   private releaseLock?: () => Promise<void>
   private closingFlag = false
   private stopping?: Promise<void>
+  /** Every Router Session this process runs, in shard order; shard 0 is `masterId`. */
+  private routerIdsValue: string[] = []
+  /** The `router` health entry, claimed once so a restart does not claim it twice. */
+  private routerHealth?: ReturnType<HealthBoard['claim']>
   /** The Watchdog Session, which the external control loop prompts on a schedule. */
   readonly watchdogId!: string
   private watchdog?: WatchdogLoop
@@ -111,6 +116,8 @@ export class Runtime extends Service implements SourceHost {
       const feishu = () => setup.configured() && !!setup.deployment.feishu
       const prompts = this.prompts = new Prompts(store, () => machine.promptMaxChars.get(), deployed, feishu)
       const masterId = this.masterId = store.get(KV.runtime.masterId) ?? `orchestrator-${key(machine.stateDir)}`
+      // Router Sessions: the master, plus one per shard when the operator asked for sharding (article §2.1).
+      this.routerIdsValue = shardSessionIds(masterId, machine.routerShards.get())
       // A Session of its own, outside the Router: the external control loop of the official design (article §6).
       this.watchdogId = `watchdog-${key(machine.stateDir)}`
       store.set(KV.runtime.masterId, masterId)
@@ -130,7 +137,8 @@ export class Runtime extends Service implements SourceHost {
         promptVersion: id => this.sessions.promptVersion(id), mayRead: (id, revision) => this.sessions.mayRead(id, revision),
         feishuPageSize: () => feishuSettings(sources).readPageSize, sourceLink: link }
       const sessions = this.sessions = new Sessions({ context: ctx, store, prompts, effects, health: board.claim('models'), masterId,
-        stateDir: machine.stateDir, asyncSubagents: () => this.machine.asyncSubagents.get(),
+        stateDir: machine.stateDir, routerIds: () => this.routerIdsValue,
+        asyncSubagents: () => this.machine.asyncSubagents.get(),
         lifetime: this.lifetime,
         closing: () => this.closing(), environment,
         tools: (agent, ticket) => ticket ? executorTools(this.toolHost, ticket) : mainTools(this.toolHost, agent) })
@@ -227,6 +235,11 @@ export class Runtime extends Service implements SourceHost {
     this.sessions.install()
     this.executor.install()
     await this.sessions.ensure(this.masterId, this.machine.stateDir, 'dsh-superagent orchestrator', 'orchestrator')
+    for (const [index, id] of this.routerIdsValue.entries()) {
+      if (index === 0) continue
+      await this.sessions.ensure(id, this.machine.stateDir, `dsh-superagent orchestrator shard ${index}`, 'orchestrator')
+    }
+    this.reportRouterHealth()
     for (const id of this.settings.syncable()) await this.settings.sync(id).catch(() => { /* sync() records its failure in health. */ })
     // If stop() was called while awaiting setup, session creation, or policy sync, do not start background loops.
     if (this.closing()) return
@@ -259,6 +272,14 @@ export class Runtime extends Service implements SourceHost {
       this.ctx.logger.info('dsh-superagent: the declarative settings changed the Source instances (%s -> %s); restarting to mount them', before, after)
       this.setup.restart()
     }
+  }
+  /** Reports how many Router Sessions serve this instance, so a sharded deployment is visible in health. */
+  private reportRouterHealth(): void {
+    const count = this.routerIdsValue.length
+    try {
+      this.routerHealth ??= this.board.claim('router', { state: 'ready', detail: '' })
+      this.routerHealth.set({ state: 'ready', detail: count === 1 ? 'one Router Session' : `${count} Router Sessions (sharded by Thread)` })
+    } catch (error) { this.ctx.logger.warn('dsh-superagent could not report Router health: %s', String(error)) }
   }
   /**
    * Ensure the Watchdog Session and start its loop. It is deliberately outside the Router: it receives no Triggers,

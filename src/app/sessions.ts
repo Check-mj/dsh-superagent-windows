@@ -33,6 +33,8 @@ export interface SessionsHost {
   readonly masterId: string
   /** The instance state directory, used as a Session's working directory when no Ticket names one. */
   readonly stateDir: string
+  /** The Router Sessions this instance runs: the master Session, plus one per shard when sharding is on. */
+  routerIds(): string[]
   /** Whether background subagents are enabled (article §4.1); off by default. */
   asyncSubagents(): boolean
   readonly lifetime: AbortSignal
@@ -142,7 +144,7 @@ export class Sessions {
     ctx.inject(['agentPresets'], child => {
       child.on('agent-preset/selected', (sessionId, preset) => {
         const ticketId = ticketOfSession(sessionId), agent = ctx.agents.get(sessionId as SessionId)
-        const ours = sessionId === this.host.masterId ? ROUTER_PRESET : ticketId && this.host.store.tickets.get(ticketId) ? WORKER_PRESET : undefined
+        const ours = this.host.routerIds().includes(sessionId) ? ROUTER_PRESET : ticketId && this.host.store.tickets.get(ticketId) ? WORKER_PRESET : undefined
         if (!ours || preset === ours || !agent) return
         const presets = child.get('agentPresets') as { select(agent: Agent, preset: string): Promise<string> }
         presets.select(agent, ours).catch(() => {})
@@ -255,7 +257,8 @@ export class Sessions {
   private async decorate(agent: Agent): Promise<void> {
     if (this.bindings.has(agent)) return
     const host = this.host
-    const master = agent.id === host.masterId
+    // Any Router Session gets the Router treatment: the master, and each shard when sharding is on.
+    const master = host.routerIds().includes(agent.id)
     const ticket = master ? undefined : this.ticketOf(agent)
     if (!master && !ticket) { this.limitSubagent(agent); return }
     const binding: SessionBinding = { disposers: [] }
