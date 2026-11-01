@@ -72,6 +72,13 @@ export function OverviewPage() {
     onClick={() => navigate(route)}>{t('details')}</button>
   return <>
     {error && <LoadState error={error} loading={false} />}
+    <Section title={t('aboutWhatTitle')}>
+      <Hint>{t('aboutWhat')}</Hint>
+      <div className="dt-row-meta dt-row-buttons">
+        <Button variant="outline" size="sm" icon={<Icon name="settings" size={14} />}
+          onClick={() => navigate({ page: 'about' })}>{t('aboutOpenGuide')}</Button>
+      </div>
+    </Section>
     <Section title={t('pendingTickets')} count={data.person.length}>
       {data.person.length ? <ul className="dt-list dt-cards">{data.person.map(ticket => <TicketLine key={ticket.id} ticket={ticket} question
         onChanged={reload} />)}</ul>
