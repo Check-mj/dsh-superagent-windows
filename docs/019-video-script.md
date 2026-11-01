@@ -16,9 +16,9 @@
 ### 0:00–0:20 标题与定位
 
 （画面：DSH-Superagent 窗口 + 桌面快捷方式，缓慢推近；右下角常驻一行小字：
-`Windows deep adaptation of deepseek-ai/dsh-superagent-prototype · MIT © 2026 DeepSeek Harness Team`）
+`Windows deep adaptation of the DeepSeek team's SuperAgent for DSH · MIT © 2026 DeepSeek Harness Team`）
 
-> 这是 DSH-Superagent，DeepSeek Harness 上「Super-agent」形态的 Windows 深度适配版。
+> 这是 DSH-Superagent，DeepSeek 团队最新的 SuperAgent 在 DSH 工具里的 Windows 深度适配版。
 > 它把官方原型做成能双击打开的应用，并补上了官方文章里描述、原型还没实现的部分。
 > 先说清楚：这是**非官方**项目，上游是 DeepSeek 官方的 dsh-superagent-prototype，MIT 许可，版权归原作者。
 
@@ -91,7 +91,7 @@
 
 ## 旁白稿（可直接照读，约 950 字）
 
-> 这是 DSH-Superagent，DeepSeek Harness 上 Super-agent 形态的 Windows 深度适配版。它把官方原型做成能双击打开的
+> 这是 DSH-Superagent，DeepSeek 团队最新的 SuperAgent 在 DSH 工具里的 Windows 深度适配版。它把官方原型做成能双击打开的
 > 应用，并补上了官方文章里描述、原型还没实现的部分。先说清楚：这是非官方项目，上游是 DeepSeek 官方的
 > dsh-superagent-prototype，MIT 许可，版权归原作者。
 >
@@ -165,7 +165,7 @@
 
 - 录制：OBS，1920×1080/30fps，码率 ≥8000kbps；分镜单独成文件，命名 `shot-01-title.mp4` … `shot-10-end.mp4`
 - 输出：`DSH-Superagent-0.1.0-intro.mp4`（H.264/AAC，≤5 分钟）
-- 封面：`DSH-Superagent-0.1.0-cover.png`，主标题 `DSH-Superagent`，副标题 `dsh super agent 的 Windows 深度适配版`，
+- 封面：`DSH-Superagent-0.1.0-cover.png`，主标题 `DSH-Superagent`，副标题 `DeepSeek SuperAgent · Windows 深度适配版`，
   角标必须含 `Upstream: deepseek-ai/dsh-superagent-prototype · MIT`
 - 字幕：`.srt` 与硬字幕各一份（旁白稿即字幕源，按句子切分）
 

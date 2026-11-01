@@ -15,7 +15,7 @@ First publishable Windows adaptation.
 - Portable Electron shell that starts the DeepSeek Harness backend itself, self-locating its install root, with
   bundled `git`, `gh` and PowerShell 7 under `tools/`, and an installer that copies the payload per user and creates
   Desktop and Start Menu shortcuts.
-- Diagnostics instead of a blank window: preflight of the bundled tools, backend logs in `%APPDATA%\Superagentpp.log`,
+- Diagnostics instead of a blank window: preflight of the bundled tools, backend logs in `%APPDATA%\Superagent\app.log`,
   readable error screens, and automatic backend restart.
 - Instance management: `--instance <name>` reads `config/instances.json`, so one window per context boundary, each
   with its own `stateDir`, settings and credentials; plus `instances.ps1` (list/add/remove/start/shortcut) and an
@@ -37,6 +37,9 @@ First publishable Windows adaptation.
 ### Changed
 - The bundle is now installed from this repository's git source, so the plugin page's 代码来源 names a repository
   instead of a local path; `lib/` is committed so a git install needs no build.
+- The product line is now stated as **DeepSeek 团队最新的 SuperAgent 在 DSH 工具里的 Windows 深度适配版** ("the Windows deep adaptation of the DeepSeek team's latest SuperAgent for the DSH tool") in the README banner,
+  the plugin page description, `package.json`, the desktop About dialog and the repository About; the desktop
+  package was rebuilt so the installed About dialog matches.
 - Attribution is explicit in README, `NOTICE`, `LICENSE` and the plugin page's locale description: upstream is the
   official DeepSeek prototype (MIT, © 2026 DeepSeek Harness Team), and this fork deletes its own version of a
   mechanism once upstream ships one.

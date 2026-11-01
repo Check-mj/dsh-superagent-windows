@@ -1,6 +1,6 @@
 # DSH-Superagent
 
-> **这是官方项目的 Windows 深度适配版（非官方产品，版权归原作者）。**
+> **这是 DeepSeek 团队最新的 SuperAgent 在 DSH 工具里的 Windows 深度适配版（非官方产品，版权归原作者）。**
 > Upstream: [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) · MIT · Copyright (c) 2026 DeepSeek Harness Team
 >
 > 本仓库 fork 自上面这个官方原型，目标是让它成为**在 Windows 上可日常使用的深度适配版**：桌面应用、打包工具链、
@@ -16,7 +16,7 @@
 
 > **上游的定位没有变**：官方原型是研究代码、不是官方产品。本适配版继承这一说明，并把它做成可日常使用的一层。
 
-DSH-Superagent 是 DeepSeek Harness 上「Super-agent」形态的 Windows 深度适配版。它不是一个只盯一个仓库的脚本，
+DSH-Superagent 把 DeepSeek 团队最新的 SuperAgent 形态搬进 DSH 工具，并做了 Windows 深度适配。它不是一个只盯一个仓库的脚本，
 而是把这种形态做成**能日常使用的软件**，覆盖一条完整链路和它周围的人：
 
 | 它做什么 | 具体能力 |

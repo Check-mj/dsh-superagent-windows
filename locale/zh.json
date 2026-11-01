@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "DSH-Superagent",
-    "description": "DSH-Superagent —— dsh super agent 的 Windows 深度适配版（官方 dsh-superagent-prototype 的 fork，非官方产品）。它把 GitHub 仓库（issue/PR/评论/CI）与可选的飞书群聊变成持续的事件源：获授权的请求变成工单，在各自隔离的 DSH 会话里执行，结果回贴到原处；面板管触发、评估、执行与设置，桌面应用提供一键安装、多实例与故障自愈，并按官方设计补齐了上游尚未实现的 Watchdog 控制回路与 Router 分片。上游：https://github.com/deepseek-ai/dsh-superagent-prototype（MIT，Copyright (c) 2026 DeepSeek Harness Team）；本构建：https://github.com/Check-mj/dsh-superagent-windows"
+    "description": "DSH-Superagent —— DeepSeek 团队最新的 SuperAgent 在 DSH 工具里的 Windows 深度适配版（官方 dsh-superagent-prototype 的 fork，非官方产品）。它把 GitHub 仓库（issue/PR/评论/CI）与可选的飞书群聊变成持续的事件源：获授权的请求变成工单，在各自隔离的 DSH 会话里执行，结果回贴到原处；面板管触发、评估、执行与设置，桌面应用提供一键安装、多实例与故障自愈，并按官方设计补齐了上游尚未实现的 Watchdog 控制回路与 Router 分片。上游：https://github.com/deepseek-ai/dsh-superagent-prototype（MIT，Copyright (c) 2026 DeepSeek Harness Team）；本构建：https://github.com/Check-mj/dsh-superagent-windows"
   }
 }

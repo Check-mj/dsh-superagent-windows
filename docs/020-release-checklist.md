@@ -21,8 +21,8 @@ pnpm release:check
 |---|---|
 | `pnpm release:check` | ✅ **12 passed, 0 failed / READY TO PUBLISH** |
 | Release | ✅ `v0.1.0`（tag 指向 `a7615c7`；zip 里的可执行文件与当前 `main` 逐字节一致，之后的提交只改文档） |
-| zip | `DSH-Superagent-0.1.0-win-x64.zip`，158,418,215 字节 |
-| SHA-256 | `ebf8ea2286be2b083a2ab72c6a2f1e00385587682ff6fe4ac3e09081b1912295`（与安装器 `$checksums` 一致） |
+| zip | `DSH-Superagent-0.1.0-win-x64.zip`，158,418,237 字节 |
+| SHA-256 | `c3326969af76e2e75349567a628dc4ef94139f990c214cb5a747b21dabb586d5`（与安装器 `$checksums` 一致；这是第三次上传，前两次的校验值见 Release 说明的资产历史） |
 | 桌面应用 | ✅ 实测 `setup: null`、`runtime: ready`、`router: one Router Session` |
 
 下面 A–F 的复选框只在"这一份已发布产物上真的跑过"的条目上打勾；没跑的保留空框并写明原因，不要靠印象打勾。

@@ -1205,7 +1205,7 @@ function buildMenu() {
               title: '关于 DSH-Superagent',
               message: `DSH-Superagent ${app.getVersion()}`,
               detail: [
-                'DeepSeek Harness · superagent 的 Windows 深度适配版（非官方产品）',
+                'DeepSeek 团队 SuperAgent · DSH 工具里的 Windows 深度适配版（非官方产品）',
                 '',
                 '上游：deepseek-ai/dsh-superagent-prototype',
                 '      MIT · Copyright (c) 2026 DeepSeek Harness Team',

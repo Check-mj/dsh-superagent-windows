@@ -754,7 +754,7 @@ const TEXT = {
   'aboutNotePause': ['暂停处理只停止新工作，不会中断正在跑的工单。', 'Pausing stops new work; it does not interrupt Tickets already running.'],
   'aboutNoteRestart': ['执行设置里标注「重启后生效」的项（例如 Router 分片数）在重启应用后才会应用。', 'Items marked “takes effect after a restart” in the Execution settings (Router shards, for example) apply after the app restarts.'],
   'aboutTitle': ['关于这个构建', 'About this build'],
-  'aboutIntro': ['本插件是官方原型 dsh-superagent 的 Windows 构建版：功能与上游保持一致，另加 Windows 移植、桌面应用、多实例管理与本仓库记录的可选扩展。上游更新时可合并，差异见下表的 WINDOWS-DELTA。', 'This plugin is the Windows build of the official dsh-superagent prototype: same behaviour as upstream plus the Windows port, the desktop app, multi-instance support and the opt-in extensions recorded in this repository. Upstream can be merged; see WINDOWS-DELTA for the differences.'],
+  'aboutIntro': ['本插件是 DeepSeek 团队最新的 SuperAgent 在 DSH 工具里的 Windows 深度适配版（官方原型的 fork）：功能与上游保持一致，另加 Windows 移植、桌面应用、多实例管理与本仓库记录的可选扩展。上游更新时可合并，差异见下表的 WINDOWS-DELTA。', 'This plugin is the Windows deep adaptation of the latest SuperAgent from the DeepSeek team for the DSH tool (a fork of the official prototype): same behaviour as upstream plus the Windows port, the desktop app, multi-instance support and the opt-in extensions recorded in this repository. Upstream can be merged; see WINDOWS-DELTA for the differences.'],
   'aboutUpstream': ['上游官方仓库（代码来源）', 'Upstream repository (origin of the code)'],
   'aboutBuild': ['构建仓库（本 Windows 版本）', 'Build repository (this Windows build)'],
   'aboutDelta': ['与上游的差异清单', 'Differences from upstream'],
