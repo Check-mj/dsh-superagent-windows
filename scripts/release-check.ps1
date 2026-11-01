@@ -1,4 +1,4 @@
-﻿﻿# Release rehearsal for DSH-Superagent: one command that says whether this checkout may be published.
+﻿# Release rehearsal for DSH-Superagent: one command that says whether this checkout may be published.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-check.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-check.ps1 -SkipTests   # fast structural pass
