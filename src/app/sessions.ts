@@ -58,6 +58,8 @@ declare module '@deepseek-ai/cordis' {
  * changes the profile, schedules work or starts goals outside the worker slots, the pause and a person's hold, starts or
  * messages other Sessions, or edits documents.
  */
+/** What a main Session keeps: its own tools, the shell it actually has, and the job controls it must not spend time waiting on. */
+const MASTER_TOOLS = ['skill', 'bash', 'pwsh', 'read', 'read_image', 'job_output', 'job_list', 'job_kill']
 const WORK_TOOLS = ['read', 'write', 'edit', 'read_image', 'glob', 'grep', 'bash', 'pwsh', 'job_output', 'job_list', 'job_kill', 'web_search',
   'web_fetch', 'skill', 'todo_write', 'subagent', 'list_subagent_models', 'send_message', 'list_agents', 'interrupt_agent']
 /** What the main Session is told when it would wait: what it waits for comes to it, and a waiting step holds back the next. */
@@ -261,10 +263,12 @@ export class Sessions {
     const register = this.registerTool(agent, binding)
     for (const tool of host.tools(agent, ticket)) register(tool.name, tool.description, tool.schema, tool.execute)
     if (master) {
-      // A Windows profile has no `bash` tool — the shell is `pwsh` there — and `tools.restrict` refuses to name a tool
-      // the profile does not have, which would fail the whole Session setup.
-      const shellTool = process.platform === 'win32' ? 'pwsh' : 'bash'
-      binding.disposers.push(agent.ctx.tools.restrict({ allow: ['skill', shellTool, 'read', 'read_image', 'job_output', 'job_list', 'job_kill'] }),
+      // `tools.restrict` refuses to name a tool the profile does not have, so take the tool list from what is really
+      // there: this keeps a POSIX profile on `bash`, a Windows one on `pwsh`, and a Windows profile that also loads a
+      // bash plugin on both, without guessing from the platform string.
+      const parentScope = scopeParentOf(agent)
+      const allow = MASTER_TOOLS.filter(name => agent.ctx.tools.get(name, parentScope))
+      binding.disposers.push(agent.ctx.tools.restrict({ allow }),
         agent.ctx.tools.guard(execution => noWait(execution, () => this.routed(agent))))
     } else {
       // An Executor Session keeps the profile's work tools it has, which DSH requires to be known; its own tools are not masked.

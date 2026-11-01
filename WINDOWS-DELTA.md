@@ -47,12 +47,12 @@ tag       upstream-base   记录我们 fork 时的官方基线（6337fc8）
 
 | 位置 | 上游行为 | 我们的改动 | 为什么 |
 |---|---|---|---|
-| `agentGhConfig()` | 不存在（上游用 wrapper 脚本选账号） | 新增，指向 `<stateDir>/gh-config` | Node 拒绝 spawn `.cmd`/`.bat`（CVE-2024-27980 之后抛 `EINVAL`），所以 Windows 上不能用 wrapper 脚本当 CLI，改用 `GH_CONFIG_DIR` 选账号 |
+| `agentGhConfig()` | 不存在（上游用 wrapper 脚本选账号） | 新增，指向 `<stateDir>/gh-config`；`agentVariables()` 默认注入 `GH_CONFIG_DIR` | 两种账号模型现在**都支持**：可以直接指向 `gh.exe` + `GH_CONFIG_DIR`（默认、最省事），也可以指向上游文档里的 `.cmd` 包装器（`runAsWorker` 经 `cmd.exe /d /c <prog> <args...>` 启动） |
 | `agentVariables()` | 不含 `GH_CONFIG_DIR` | win32 下注入 `GH_CONFIG_DIR` | 让 worker 会话与 git credential helper 都落到智能体账号 |
 | `written()` | 按 `\n` 切前两行、精确匹配 `# Written by …` | 按 `/\r?\n/` 切，并剥掉行首 `@REM ` | Windows 垫片是 batch 文件，`#` 注释会被 cmd 当命令执行，标记必须写成 `@REM # Written by …` |
 | `writeEnvironment()` shim | 写无扩展名 `#!/bin/sh` 文件 | win32 写 `<name>.cmd`（`@echo off` + `@REM` 标记 + 绝对路径调用 + `%*` + `exit /b`） | 无扩展名文件在 Windows PATH 查找（PATHEXT）里根本不可执行 |
 | `writeEnvironment()` 额外 | — | 创建 `<stateDir>/gh-config` 目录 | 给 gh 一个可写的独立配置目录 |
-| PATH 剥离 | POSIX 垫片会把自己从 PATH 里剔除再 exec | **Windows 垫片不做 PATH 剥离** | 垫片直接以绝对路径调用真实 `.exe`，不存在递归；batch 里重建 PATH 对含 `&`/空格/括号的路径很脆弱，收益为零 |
+| PATH 剥离 | 垫片把自己从 PATH 里剔除再 exec | Windows 垫片**同样重建 PATH**（`%~dp0` 比对 + `for` 拆分 + `endlocal & set`） | 恢复上游的语义保证：被调用的包装器若按名字解析 `gh`，会落到真实二进制而不是再次进入垫片。已行为验证：自身目录消失、其余条目保留 |
 
 **注意：git 凭据层完全没改。** `credentialHelper()`、`gitQuote()`、`worker-gitconfig` 内容、`verifyEnvironment()` 全部保持上游原样——实测在 Windows 上 `git config -z --show-origin --get-all credential.https://github.com.helper` 的渲染与期望值逐字节相等。
 
@@ -181,3 +181,23 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 1. `~/.ssh/config` 路由了 github → 用 SSH（不依赖代理，最稳）
 2. 否则若系统代理开启 → 透传代理给后端（HTTPS 传输）
 3. 否则直连（在无阻断网络下等价于上游默认行为）
+
+### 3.4 实战暴露的两处（第一单端到端才出现）
+
+| 位置 | 上游行为 | 改动 | 为什么 |
+|---|---|---|---|
+| `src/app/sessions.ts` 主 Session 工具限制 | 硬编码 `allow: ['skill','bash',...]` | 从**实际工具注册表**取：`MASTER_TOOLS.filter(name => agent.ctx.tools.get(name, scope))` | `tools.restrict()` 拒绝名字里含有不存在的工具，Windows 首启直接 `Session setup` 失败。按平台猜 `pwsh` 也不对——Windows 上装了 bash 插件的 profile 两者都有 |
+| `src/executor/dsh.ts` prepare 执行 | `['sh','-c', command]` | Windows 走 `['cmd.exe','/d','/s','/c', command]` | Windows 无 `sh`；POSIX shell 还会把命令里每个 Windows 路径的反斜杠吃掉，报 `command not found`。**静态检查发现不了，只有真跑工单会暴露** |
+
+### 3.5 批次包装器（`.cmd`）的参数传递
+
+`runAsWorker()` 遇到 `.cmd`/`.bat` 时改用 `cmd.exe`，但**必须把程序与参数作为分开的 argv 传**：
+
+```ts
+// 正确：Node 逐个引用，cmd 只解析一次
+['cmd.exe', '/d', '/c', argv[0], ...argv.slice(1)]
+
+// 错误：整行拼成一个字符串，cmd 会二次解析引号，
+// 目标程序拿到的是 \"…\" 而不是 "…"（实测失败）
+['cmd.exe', '/d', '/s', '/c', argv.map(quote).join(' ')]
+```

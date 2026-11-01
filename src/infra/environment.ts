@@ -117,8 +117,18 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
   ].join('\n')
   // A batch shim cannot strip PATH as the POSIX one does, so it must call the real executable by absolute path: a
   // name-based call inside the configured wrapper would re-enter this shim, and Node refuses to spawn a `.cmd` anyway.
+  // The batch twin of `withoutShims`: a wrapper script that resolves `gh` or `lark-cli` by name must reach the real
+  // binary, never this shim again. `%%~dp0` ends with a separator, so the last character is dropped for the comparison.
+  const withoutShimsWindows = [
+    'set "_SELF=%~dp0"',
+    'if "%_SELF:~-1%"=="\\" set "_SELF=%_SELF:~0,-1%"',
+    'setlocal EnableDelayedExpansion',
+    'set "_NEW="',
+    'for %%P in ("!PATH:;=" "!") do if /I not "%%~P"=="!_SELF!" set "_NEW=!_NEW!;%%~P"',
+    'endlocal & set "PATH=%_NEW:~1%"',
+  ].join('\r\n')
   const run = (program: string): string => windows
-    ? `"${program}" %*\r\nexit /b %ERRORLEVEL%`
+    ? `${withoutShimsWindows}\r\n"${program}" %*\r\nexit /b %ERRORLEVEL%`
     : `${withoutShims}\nexec ${shellQuote(program)} "$@"`
   const fail = (message: string): string => windows
     ? `>&2 echo ${message}\r\nexit /b 1`
@@ -154,7 +164,13 @@ export function applyEnvironment(variables: Record<string, string | undefined>, 
 
 /** Spawns a command through the DSH subprocess runtime, which strips credential-shaped environment variables. */
 export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[], cwd: string, signal: AbortSignal, env?: Record<string, string>): Promise<string> {
-  const handle = subprocess.spawn({ argv, cwd, graceMs: 2000, signal, ...env ? { env } : {}, stdio: { stdin: 'ignore', stdout: { maxBytes: 1 << 20 }, stderr: { maxBytes: 1 << 16 } } })
+  // Node refuses to spawn `.cmd`/`.bat` directly (the CVE-2024-27980 hardening), so a batch wrapper CLI — the account model
+  // docs/006-deployment.md describes — is handed to cmd.exe, which is also the only place its quoting rules apply.
+  const batch = process.platform === 'win32' && /\.(cmd|bat)$/i.test(argv[0] ?? '')
+  // Hand the program and its arguments as SEPARATE argv entries: Node then quotes each one for cmd, whereas joining
+  // them into one command line lets cmd re-parse the quotes and hand the program literal backslash-quotes.
+  const spawnArgv = batch ? ['cmd.exe', '/d', '/c', argv[0]!, ...argv.slice(1)] : argv
+  const handle = subprocess.spawn({ argv: spawnArgv, cwd, graceMs: 2000, signal, ...env ? { env } : {}, stdio: { stdin: 'ignore', stdout: { maxBytes: 1 << 20 }, stderr: { maxBytes: 1 << 16 } } })
   const { exitCode } = await handle.done
   const read = (reader: SubprocessOutputReader | undefined): string => reader?.readFrom(0).text ?? ''
   if (exitCode === 0) return read(handle.collected.stdout)
