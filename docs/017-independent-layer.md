@@ -106,7 +106,10 @@ worker preset 里确实同时装了 `@deepseek-ai/dsh-tool-subagent` 与 `@deeps
 **结论**：`docs/013`/`docs/017` 之前写的「上游 `dsh-tool-subagent` 没有暴露后台模式」**是错的**——当时的判断
 依据只是 grep 包里有没有 `background` 字样，没有验证真实行为。
 
-**处置（待确认后执行）**：按 `docs/017` §4 的规则「上游实现了同名能力就切回上游」，我们的
-`src/app/subagents.ts` 与两个工具应当**退役删除**。唯一需要先确认的是：截图那次对话跑在哪个 Session
-（标题显示 `dsh-superagent orchestrator shard…`，但 router preset 的插件列表里没有 `tool-subagent`）。
-如果是 worker Session，则上游覆盖 worker；如果 router Session 也能用，那我们的模块就完全冗余。
+**处置（已执行）**：会话日志显示那个 `orchestrator-…-shard-1` 会话用的是 **standard preset 全套工具**
+（`edit`、`subagent`、`subagent_fork`、`create_goal`…），既没有 `MASTER_TOOLS` 限制，也没有我们的提示段——
+也就是说它**根本没被 dsh-superagent 接管**。既然它跑的是 standard preset，而 standard/worker preset 都带
+`dsh-tool-subagent`，上游的后台子代理在本环境**已可用**。
+
+因此按 §4 的规则：**P1 已退役**——删除 `src/app/subagents.ts`、`tests/subagents.spec.ts`、两个工具、
+`asyncSubagents` 配置项与相关接线；`docs/007`、`docs/018`、`WINDOWS-DELTA` 同步更新。

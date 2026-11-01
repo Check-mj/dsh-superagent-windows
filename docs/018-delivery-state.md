@@ -8,7 +8,7 @@
 |---|---|---|
 | **P3 Watchdog 深化（§6）** | ✅ 已实现并真实运行验证 | `src/app/watchdog.ts`、`src/app/runtime.ts`；`tests/watchdog.spec.ts`；`docs/012` §4.1 |
 | **P4 状态存储接缝（§5）** | ✅ 已实现（接口预留，行为零变化） | `src/app/state-store.ts`、`src/app/source-context.ts`；`tests/state-store.spec.ts` |
-| **P1 异步子任务（§4.1 右半边）** | 🟡 已接线（opt-in，默认关闭），真实并发验收待做 | `src/app/subagents.ts`、`src/app/sessions.ts`；`tests/subagents.spec.ts`；`docs/017` P1 |
+| **P1 异步子任务（§4.1 右半边）** | ⛔ **已退役**：实测上游 `subagent` 已支持后台运行，按 docs/017 §4 切回上游，删除我们的重复实现 | `docs/017` §7（证据与处置） |
 | **P2 Router 分片（§2.1）** | 🟡 放置、预置、分发均已接线；分发只到单元级证据（无真实 Trigger 可造） | `src/app/shards.ts`、`src/app/assessment.ts`、`src/app/sessions.ts`、`src/app/runtime.ts`；`tests/shards.spec.ts` |
 | 多实例（§8.3，前序工作） | ✅ 服务侧 + 应用侧 + 管理窗口 | `docs/015`、`docs/016` |
 | Watchdog 基础（§6，前序工作） | ✅ | `docs/012` |
@@ -82,7 +82,7 @@
 
 | 项 | 状态 |
 |---|---|
-| P1 异步子任务（§4.1 右半边） | ✅ 已接线（opt-in），⏳ 人工验收（§7） |
+| P1 异步子任务（§4.1 右半边） | ⛔ 已退役，上游已提供（§7 证据） |
 | P2 Router 分片（§2.1） | ✅ 放置/预置/分发已接线（默认 1），⏳ 人工验收（§6） |
 | P3 Watchdog 深化（§6） | ✅ 完成并实测 |
 | P4 状态存储接缝（§5） | ✅ 完成，行为零变化 |

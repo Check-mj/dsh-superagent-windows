@@ -10,7 +10,6 @@ import { key, liveTicket, type Ticket } from '../core/index.ts'
 import { mandateInstructions, ticketOfSession } from '../executor/dsh.ts'
 import type { HealthEntry } from '../infra/health.ts'
 import { AgentDelivery, messageId } from './delivery.ts'
-import { BackgroundSubagents, assistantResult } from './subagents.ts'
 import type { Effects } from './effects.ts'
 import type { Variable } from './execution-environment.ts'
 import { RetryHealth } from './retry-health.ts'
@@ -31,12 +30,8 @@ export interface SessionsHost {
   /** The `models` health entry, which reports managed sessions waiting on a model-budget retry. */
   readonly health: HealthEntry
   readonly masterId: string
-  /** The instance state directory, used as a Session's working directory when no Ticket names one. */
-  readonly stateDir: string
   /** The Router Sessions this instance runs: the master Session, plus one per shard when sharding is on. */
   routerIds(): string[]
-  /** Whether background subagents are enabled (article §4.1); off by default. */
-  asyncSubagents(): boolean
   readonly lifetime: AbortSignal
   closing(): boolean
   /** Execution environment variables for `ticket`, rendered into its worker's system prompt. */
@@ -104,8 +99,6 @@ export class Sessions {
   private readonly agentDelivery: AgentDelivery
   /** Decorated agents mapped to their registered disposers and skill scope until the agent is disposed or `Sessions.dispose()` runs. */
   private readonly bindings = new Map<Agent, SessionBinding>()
-  /** The background-subagent lifecycle, constructed in the constructor (delivery needs `this`). */
-  private subagents!: BackgroundSubagents
   private readonly retryHealth = new RetryHealth()
   private readonly ctx: Context
   /** Registers ordered `relay` and `notice` effect handlers that deliver to the main Session. */
@@ -115,14 +108,6 @@ export class Sessions {
     // Deliver relays and notices to the main Session in the order they were queued.
     host.effects.handle('relay', ({ text }, requestId) => this.prompt(host.masterId, requestId, text, 'steer'), { ordered: true })
     host.effects.handle('notice', ({ value, summary }, name) => this.inject(name, value, summary), { ordered: true })
-    // Background subagents (docs/017 P1). Delivery to the child and back to the parent goes through this class, which owns
-    // both ends; the child's completion is observed on `agent/status` below.
-    this.subagents = new BackgroundSubagents({
-      ensure: async (session, title, prompt, cwd) => { await this.ensure(session, cwd ?? host.stateDir, title, 'worker'); void prompt },
-      deliver: async (session, text) => { await this.prompt(session, `subagent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, text, 'queue') },
-      now: () => Date.now(),
-      log: message => this.ctx.logger.info('dsh-superagent %s', message),
-    }, { nextId: (parent, at) => `${parent}-sub-${at.toString(36)}` })
   }
   /** Subscribes to host agent and session events so newly created sessions are decorated and model-budget retries are reflected in health. Call once at startup. */
   install(): void {
@@ -152,11 +137,6 @@ export class Sessions {
     })
     ctx.on('agent/status', ({ agent, status }) => {
       if (status === 'idle' && !this.host.closing()) { this.retryHealth.clear(agent.id); this.updateModelHealth() }
-      // A background subagent that went idle has produced its answer: report it to the parent Session as an event.
-      if (status === 'idle' && this.host.asyncSubagents()) {
-        void this.subagents.finish(agent.id, assistantResult(agent.session.snapshotEvents()))
-          .catch((error: unknown) => this.ctx.logger.warn('dsh-superagent could not report a subagent result: %s', String(error)))
-      }
     })
   }
   /** Resolves or creates session `id` in workspace `cwd`, initializes its role model, decorates it with prompts/skills/tools, sets `danger-full-access` permissions, and renames it to `title`. */
@@ -285,7 +265,6 @@ export class Sessions {
     if (this.bindings.get(agent) !== binding) return
     const register = this.registerTool(agent, binding)
     for (const tool of host.tools(agent, ticket)) register(tool.name, tool.description, tool.schema, tool.execute)
-    if (host.asyncSubagents()) this.registerSubagentTools(agent, ticket, register)
     if (master) {
       // `tools.restrict` refuses to name a tool the profile does not have, so take the tool list from what is really
       // there: this keeps a POSIX profile on `bash`, a Windows one on `pwsh`, and a Windows profile that also loads a
@@ -298,24 +277,6 @@ export class Sessions {
       // An Executor Session keeps the profile's work tools it has, which DSH requires to be known; its own tools are not masked.
       binding.disposers.push(...this.workOnly(agent, ticket!.id))
     }
-  }
-  /**
-   * Registers the two tools behind `asyncSubagents`: start a background subagent, or cancel one. Neither exists unless
-   * the operator turned the feature on, so an ordinary deployment's tool surface is unchanged.
-   */
-  private registerSubagentTools(agent: Agent, ticket: Ticket | undefined, register: RegisterTool): void {
-    register('subagent_background', 'Start a subagent that runs in its own Session while you keep working. Returns at once; its answer arrives later as a message. Use subagent_cancel to stop it.',
-      z.object({ prompt: z.string().min(1).describe('What the subagent should do.'), title: z.string().optional().describe('Short title for the subagent Session.') }).strict(),
-      async args => {
-        if (this.host.closing()) return { status: 'refused', reason: 'the orchestrator is shutting down' }
-        const session = `${agent.id}-sub-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-        const cwd = ticket?.execution?.directory
-        const record = await this.subagents.start({ parent: agent.id, session, prompt: args.prompt, ...args.title ? { title: args.title } : {}, ...cwd ? { cwd } : {} })
-        return { status: 'started', subagent: record.id, session }
-      })
-    register('subagent_cancel', 'Stop a background subagent; its result is never reported back.',
-      z.object({ subagent: z.string().describe('The id returned when the subagent started.') }).strict(),
-      async args => ({ cancelled: this.subagents.cancel(args.subagent) }))
   }
   /**
    * Whether a Session runs the router preset: as DSH's preset registry last selected it, read through the session projection

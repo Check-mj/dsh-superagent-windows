@@ -137,8 +137,8 @@ export class Runtime extends Service implements SourceHost {
         promptVersion: id => this.sessions.promptVersion(id), mayRead: (id, revision) => this.sessions.mayRead(id, revision),
         feishuPageSize: () => feishuSettings(sources).readPageSize, sourceLink: link }
       const sessions = this.sessions = new Sessions({ context: ctx, store, prompts, effects, health: board.claim('models'), masterId,
-        stateDir: machine.stateDir, routerIds: () => this.routerIdsValue,
-        asyncSubagents: () => this.machine.asyncSubagents.get(),
+        routerIds: () => this.routerIdsValue,
+
         lifetime: this.lifetime,
         closing: () => this.closing(), environment,
         tools: (agent, ticket) => ticket ? executorTools(this.toolHost, ticket) : mainTools(this.toolHost, agent) })

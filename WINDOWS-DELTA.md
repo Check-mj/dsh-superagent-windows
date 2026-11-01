@@ -219,6 +219,7 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 | 项目 | 文件 | 内容 | 与上游的关系 |
 |---|---|---|---|
 | Watchdog 深化 | `src/app/watchdog.ts`、`src/app/runtime.ts`、`src/deployment.ts` | 跨 tick 差分、停滞识别、空 digest 不投递、`watchdogGuidance` 常驻指令 | 上游若实现 §6 的进展判断，删掉这三个配置项与本模块的差分逻辑即可切回 |
-| 异步子任务（§4.1 右半边） | `src/app/subagents.ts`、`src/app/sessions.ts`、`src/app/assessment.ts` | 后台子任务生命周期：Started 立即返回、结果以事件消息回投父会话、cancel、Spill | 上游 `dsh-tool-subagent` 开放后台模式后，删掉本模块与工具、切回上游 |
 | Router 分片（§2.1） | `src/app/shards.ts`、`src/app/sessions.ts`、`src/app/runtime.ts` | `routerShards`（默认 1）、按 Thread 的稳定放置、分片 Session 预置、`router` 健康项 | 上游若实现 Router 分片，删掉本模块与配置、切回 |
 | 状态存储接缝（§5） | `src/app/state-store.ts`、`src/app/source-context.ts` | `StateStore` 接口 + 本地适配器（可选命名空间前缀），Source 状态经它构造 | 上游若支持远端状态后端，删掉适配器、改为注入上游实现 |
+
+| 异步子任务（§4.1 右半边） | （无代码） | 曾实现 `subagent_background`/`subagent_cancel`，实测上游 `subagent` 已支持后台运行后**已删除** | 无需切回：本项由上游提供，详见 docs/017 §7 |
