@@ -1,7 +1,7 @@
 @echo off
 rem ==========================================================================
-rem  Superagent portable launcher
-rem  Double-click this file (or the Desktop shortcut) to start the app.
+rem  DSH-Superagent portable launcher
+rem  Double-click this file (or the Desktop shortcut) to start DSH-Superagent.
 rem
 rem  --no-sandbox / --disable-gpu are required on machines where the app is
 rem  launched from a restricted/sandboxed context (Chromium would otherwise

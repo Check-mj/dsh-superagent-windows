@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Superagent",
+    "title": "DSH-Superagent",
     "description": "Windows adaptation of the official dsh-superagent prototype (MIT · © 2026 DeepSeek Harness Team): watch one GitHub repository, turn authorized requests into Tickets and execute each in its own DSH Session. Upstream: https://github.com/deepseek-ai/dsh-superagent-prototype ; this build: https://github.com/Check-mj/dsh-superagent-windows"
   }
 }

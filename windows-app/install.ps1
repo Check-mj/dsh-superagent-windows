@@ -1,4 +1,4 @@
-# Installs Superagent into a per-user directory and creates the shortcuts.
+# Installs DSH-Superagent into a per-user directory and creates the shortcuts.
 #
 # Nothing is pinned to one machine: the install root is a parameter with a
 # per-user default, and the plugin checkout is recorded in config\paths.json so
@@ -18,7 +18,7 @@ $src = $PSScriptRoot
 $appSource = Join-Path $src 'Superagent'
 $exeSource = Join-Path $appSource 'Superagent.exe'
 
-Write-Host '=== Superagent installer ===' -ForegroundColor Cyan
+Write-Host '=== DSH-Superagent installer ===' -ForegroundColor Cyan
 
 if (-not (Test-Path -LiteralPath $exeSource)) {
   Write-Host "Not built yet: $exeSource" -ForegroundColor Yellow
@@ -51,7 +51,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Root 'config') | Out-Null
 
 # A running window holds the executable and its resources: copying then fails or retries forever.
 if (Get-Process -Name Superagent -ErrorAction SilentlyContinue) {
-  Write-Host 'Superagent is running. Close its window(s) and re-run the installer.' -ForegroundColor Yellow
+  Write-Host 'DSH-Superagent is running. Close its window(s) and re-run the installer.' -ForegroundColor Yellow
   exit 2
 }
 Write-Host 'Copying the application...'
@@ -76,8 +76,8 @@ if (-not $NoShortcuts) {
   if (-not (Test-Path -LiteralPath $icon)) { $icon = Join-Path $Root 'Superagent.exe' }
   $shell = New-Object -ComObject WScript.Shell
   $links = @(
-    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Superagent.lnk'),
-    (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Superagent\Superagent.lnk')
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'DSH-Superagent.lnk'),
+    (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\DSH-Superagent\DSH-Superagent.lnk')
   )
   foreach ($lnk in $links) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lnk) | Out-Null
@@ -87,12 +87,12 @@ if (-not $NoShortcuts) {
     $s.Arguments = '--no-sandbox --disable-gpu'
     $s.WorkingDirectory = $Root
     $s.IconLocation = "$icon,0"
-    $s.Description = 'Superagent - DeepSeek Harness proactive GitHub agent'
+    $s.Description = 'DSH-Superagent - DeepSeek Harness proactive GitHub agent (Windows adaptation)'
     $s.Save()
     Write-Host ("shortcut     : " + $lnk)
   }
 }
 
 Write-Host ''
-Write-Host 'Done. Start it from the Desktop shortcut (Superagent).' -ForegroundColor Green
+Write-Host 'Done. Start it from the Desktop shortcut (DSH-Superagent).' -ForegroundColor Green
 Write-Host ('Logs: ' + (Join-Path $env:APPDATA 'Superagent\app.log'))

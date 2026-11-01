@@ -23,7 +23,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const APP_TITLE = 'Superagent';
+const APP_TITLE = 'DSH-Superagent';
 const SPLASH_DELAY_MS = 0;
 const START_TIMEOUT_MS = Number(process.env.SUPERAGENT_START_TIMEOUT_MS || 90000);
 const KILL_GRACE_MS = 2000;
@@ -575,7 +575,7 @@ function splashHtml(message, note) {
     <div><h1>${APP_TITLE}</h1><div class="sub">DeepSeek Harness · superagent</div></div>
   </div>
   <div class="bar"><i></i></div>
-  <div class="hint">${escapeHtml(message || '正在启动 Superagent…')}</div>
+  <div class="hint">${escapeHtml(message || '正在启动 DSH-Superagent…')}</div>
   <div class="hint" style="margin-top:6px">正在启动后端服务，首次启动可能需要十几秒。</div>
   ${noteHtml}
 </div></body></html>`;
@@ -1004,13 +1004,13 @@ function buildMenu() {
       submenu: [
         { label: '打开日志文件夹', click: () => shell.openPath(USER_DATA).catch(() => {}) },
         {
-          label: '关于 Superagent',
+          label: '关于 DSH-Superagent',
           click: () => {
             const { dialog } = require('electron');
             dialog.showMessageBox({
               type: 'info',
-              title: '关于 Superagent',
-              message: `Superagent ${app.getVersion()}`,
+              title: '关于 DSH-Superagent',
+              message: `DSH-Superagent ${app.getVersion()}`,
               detail: [
                 'DeepSeek Harness · superagent 桌面外壳',
                 `Electron ${process.versions.electron} / Chromium ${process.versions.chrome}`,

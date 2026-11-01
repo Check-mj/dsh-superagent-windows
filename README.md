@@ -9,7 +9,9 @@
 > **This repository is the Windows adaptation of the official project above, not an official DeepSeek product.**
 > The upstream code and design are MIT-licensed by the DeepSeek Harness Team; the additions here are MIT as well.
 
-# dsh-superagent
+# DSH-Superagent
+
+> **dsh super agent 的 Windows 深度适配版。** 显示名是 DSH-Superagent；npm 包名仍是 `dsh-superagent`（插件 id、profile 依赖名与内部路径不变，改名会破坏已安装实例）。
 
 > **Research prototype for reference only, not an official DeepSeek product.** This code grew out of our team's day-to-day development work, with much of the engineering done by coding agents. Treat it as research code, not production-ready software. It may still contain bugs, and its coding style and engineering practices may be inconsistent. Review and adapt it before using it in your own environment.
 >

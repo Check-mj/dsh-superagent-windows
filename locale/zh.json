@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Superagent",
+    "title": "DSH-Superagent",
     "description": "官方 dsh-superagent 原型（MIT · © 2026 DeepSeek Harness Team）的 Windows 适配版：监听单个 GitHub 仓库，把获授权的请求转为 Ticket，并在各自的 DSH 会话中执行。上游：https://github.com/deepseek-ai/dsh-superagent-prototype ；本构建：https://github.com/Check-mj/dsh-superagent-windows"
   }
 }

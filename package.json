@@ -4,7 +4,7 @@
   "license": "MIT",
   "version": "0.1.0",
   "private": true,
-  "description": "dsh super agent \u7684 Windows \u9002\u914d\u7248\uff1a\u5b98\u65b9 dsh-superagent \u539f\u578b\u7684 fork\uff0c\u8865\u9f50 Windows \u684c\u9762\u5e94\u7528\u3001\u591a\u5b9e\u4f8b\u7ba1\u7406\u3001Watchdog \u63a7\u5236\u56de\u8def\u4e0e Router \u5206\u7247\u3002\u4e0a\u6e38\uff1ahttps://github.com/deepseek-ai/dsh-superagent-prototype\uff08MIT, Copyright (c) 2026 DeepSeek Harness Team\uff09\uff1b\u672c\u6784\u5efa\uff1ahttps://github.com/Check-mj/dsh-superagent-windows",
+  "description": "DSH-Superagent \u2014\u2014 dsh super agent \u7684 Windows \u6df1\u5ea6\u9002\u914d\u7248\uff08\u5b98\u65b9 dsh-superagent \u539f\u578b\u7684 fork\uff09\uff1a\u76d1\u542c\u5355\u4e2a GitHub \u4ed3\u5e93\uff0c\u628a\u83b7\u6388\u6743\u7684\u8bf7\u6c42\u8f6c\u4e3a\u5de5\u5355\u5e76\u5728\u5404\u81ea\u7684 DSH \u4f1a\u8bdd\u4e2d\u6267\u884c\uff1b\u53e6\u542b\u684c\u9762\u5e94\u7528\u3001\u591a\u5b9e\u4f8b\u7ba1\u7406\u3001Watchdog \u63a7\u5236\u56de\u8def\u4e0e Router \u5206\u7247\u3002\u4e0a\u6e38\uff1ahttps://github.com/deepseek-ai/dsh-superagent-prototype\uff08MIT, Copyright (c) 2026 DeepSeek Harness Team\uff09\uff1b\u672c\u6784\u5efa\uff1ahttps://github.com/Check-mj/dsh-superagent-windows",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
