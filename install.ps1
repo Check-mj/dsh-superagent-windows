@@ -41,7 +41,17 @@ New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 try {
   $zip = Join-Path $tmp $asset
   Write-Step 'Downloading…'
-  Invoke-WebRequest -Uri "$base/$asset" -OutFile $zip -UseBasicParsing
+  try {
+    Invoke-WebRequest -Uri "$base/$asset" -OutFile $zip -UseBasicParsing
+  } catch {
+    # Some networks cannot reach github.com/releases (redirects are filtered) while api.github.com works: ask the
+    # release API for the asset id and download the binary from there.
+    Write-Warn "  direct download failed ($($_.Exception.Message)); retrying through api.github.com"
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/v$Version" -UseBasicParsing
+    $meta = $release.assets | Where-Object { $_.name -eq $asset } | Select-Object -First 1
+    if (-not $meta) { throw "Release v$Version has no asset named $asset." }
+    Invoke-WebRequest -Uri $meta.url -OutFile $zip -UseBasicParsing -Headers @{ Accept = 'application/octet-stream' }
+  }
   $sizeMb = '{0:N1}' -f ((Get-Item -LiteralPath $zip).Length / 1MB)
   Write-Host "  downloaded $sizeMb MB"
 
