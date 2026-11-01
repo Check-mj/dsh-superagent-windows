@@ -32,7 +32,7 @@ Trigger ──thread──▶ Thread ──tickets──▶ Ticket ──transcr
 
 ## 3. 已知缺口
 
-1. **图本身是隐式的**：卡片的字段名（`thread`/`ticket_id`/`read`）已经表达了跳转，但**提示词没有显式描述这张图**。模型需要自己发现"先读 thread，再沿 tickets 走"。这是 §3.3 未直接要求、但让其真正生效的关键，计划在下一轮改进 `prompts/` 中的一段说明（不改代码）。
+1. ~~图本身是隐式的~~：**已补**。`prompts/shared.md` 末尾新增一段，把这条引用链写成规则（trigger→thread→tickets→ticket→transcript，以及 decision 的反向引用），并要求「用卡片给出的 `read` 路径逐跳展开，而不是索取全部历史」。体积受 `tests/model-surface.spec.ts` 的按角色预算约束，加完仍在预算内。
 2. **没有自动多跳抓取**：文章强调"按需展开"，这是有意的——不做自动预取，避免把窗口塞满；保持现状。
 3. **Inline 预算未按角色区分**：目前卡片预算统一（`preview` 长度固定），文章建议按"下一步很可能用到"分级。属优化项，非缺陷。
 
@@ -49,4 +49,4 @@ Trigger ──thread──▶ Thread ──tickets──▶ Ticket ──transcr
 | Ticket→Worker Session 可跳转 | ✅ `transcript` / `assignment` / `result` 路径 |
 | Decision 双向可跳转 | ✅ `thread` / `trigger_ids` / `ticket_id` |
 | 是否内联下一跳 ID | ✅ 契约测试锁定 |
-| 提示词是否描述这张图 | ❌ 待改进（§3.1） |
+| 提示词是否描述这张图 | ✅ 已补（`prompts/shared.md`），受体积预算约束 |
