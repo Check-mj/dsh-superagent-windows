@@ -216,6 +216,9 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 | Source 实例命名 kind | `policy.ts` 的 `SourceInstanceSchema.kind`、`sources/registry.ts` | 设置里 Source 的 key 被当作 kind，一个 kind 只能一个实例 | Schema 增加可选 `kind`（缺省=id，旧配置语义不变）；registry 按实例解析 kind；**超过一个 deployment 实例时 setup 明确报错**而非静默用错仓库 | ✅ C1，C2/C3 见 `docs/010` |
 
 两条都要保持：**新增可选字段 + 明确拒绝未支持组合**，这样既向前推进，也不会让运行中的单实例部署悄悄行为改变。
+| 项目 | 文件 | 内容 | 与上游的关系 |
+|---|---|---|---|
 | Watchdog 深化 | `src/app/watchdog.ts`、`src/app/runtime.ts`、`src/deployment.ts` | 跨 tick 差分、停滞识别、空 digest 不投递、`watchdogGuidance` 常驻指令 | 上游若实现 §6 的进展判断，删掉这三个配置项与本模块的差分逻辑即可切回 |
-| 异步子任务（§4.1 右半边） | `src/app/subagents.ts` | 后台子任务生命周期：Started 立即返回、结果以事件消息回投父会话、cancel、Spill | 上游 `dsh-tool-subagent` 开放后台模式后，删掉本模块与工具、切回上游 |
+| 异步子任务（§4.1 右半边） | `src/app/subagents.ts`、`src/app/sessions.ts`、`src/app/assessment.ts` | 后台子任务生命周期：Started 立即返回、结果以事件消息回投父会话、cancel、Spill | 上游 `dsh-tool-subagent` 开放后台模式后，删掉本模块与工具、切回上游 |
 | Router 分片（§2.1） | `src/app/shards.ts`、`src/app/sessions.ts`、`src/app/runtime.ts` | `routerShards`（默认 1）、按 Thread 的稳定放置、分片 Session 预置、`router` 健康项 | 上游若实现 Router 分片，删掉本模块与配置、切回 |
+| 状态存储接缝（§5） | `src/app/state-store.ts`、`src/app/source-context.ts` | `StateStore` 接口 + 本地适配器（可选命名空间前缀），Source 状态经它构造 | 上游若支持远端状态后端，删掉适配器、改为注入上游实现 |
