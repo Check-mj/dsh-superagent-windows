@@ -2,6 +2,9 @@
 
 > 记录日期：2026-11-01。对应路线 `docs/017`。本文是这份改造的**诚实基线**：哪些已做、证据在哪、哪些没做。
 
+> **状态更新（发布后，2026-11-01）**：本文是改造过程中的基线记录，写于 P2 验收之前。现在 P1 已按 `docs/017` §4 退役、P2 已通过真实事件验收、`v0.1.0` 已发布。当前证据以 `docs/021-feature-evidence.md` 与 `docs/020-release-checklist.md` 为准；本文保留当时的判断与理由。
+
+
 ## 1. 总览
 
 | 项 | 状态 | 证据 |
@@ -29,28 +32,36 @@
 - Source context 的 `state` 访问器改为经该适配器构造（真实调用点，非装饰）
 - 行为完全一致：同样的键、同样的前缀、`undefined` 即删除的约定
 
-## 3. 未完成与继续方式
+## 3. 收尾状态（P1 退役、P2 验收）
 
-### P1 剩余（下一轮第一件事）
-1. 配置项 `asyncSubagents`（默认 `false`），仅在开启时注册 `subagent_background` / `subagent_cancel` 两个工具
-2. `ctx.on('agent/status')` 的 idle → `finish(session, lastResult)`；`agent/disposed` → 回收
-3. 真实并发验收：worker 发起慢子任务，期间父会话仍能接新消息；结束后父会话收到事件消息；cancel 后无投递
-4. 完成后在 `docs/017` 把 P1 标为 ✅，并在 `WINDOWS-DELTA.md` 确认差量条目
+### P1 异步子任务（§4.1 右半边）—— ⛔ 已退役
 
-**已有的基础**：`src/app/subagents.ts` 的生命周期与 5 个测试；`ctx.on('agent/status')` 与 `agent/disposed` 均在 `src/app/sessions.ts` 有用法可参照。
+上游 `subagent` 本身就带后台运行：验收会话（`orchestrator-…-shard-1`）里 `subagent` 被调用 5 次、`subagent_background` 0 次，
+说明异步子任务由 DSH 自身承担。按 `docs/017` §4「上游已提供的能力不再重复实现」，删除了 `src/app/subagents.ts`、它的两个工具、
+`asyncSubagents` 配置与对应测试。若上游将来回退这个能力，再按 `docs/017` §7 恢复我们的实现。
 
-### P2 未开始
-设计已在 `docs/017` P2：`routerShards=N`、按 `threadKey` 哈希分片、保持 Thread 亲和性、默认关闭、健康可见分片。风险：分片削弱全局连续性（文章自己强调的权衡），必须默认关闭。
+### P2 Router 分片（§2.1）—— ✅ 已验收
 
-## 4. 硬约束现状（本轮收尾时）
+放置、按需创建（`ensureRouterSession`，首次投递时才建会话）、按 Thread 稳定分片、健康项可见，全部接线完成。
+真实事件验收：另一账号给 issue 发一条**不带 @** 的评论后，触发 `threads=[{github,id:3}]`、健康显示
+`2 of 2 Router Sessions`、候选只落在 shard-1（`LICENSE` 出现 88 次、`orchestrator_eval` 46 次），主 Router 里为 0。
+默认仍是 `routerShards: 1`（opt-in），不开就等于普通单 Router。
+
+### 仍然存在的限制（有意留到后续）
+
+- §5 算力 / 状态 / 环境分离：只做到 `StateStore` 接缝，没有真的把状态外置成独立存储。
+- 只在 Windows 11 x64 上验证过；更老的 Windows、ARM64 未验证。
+- 每个实例需要各自的登录凭据，除非用 `ghConfigFrom` 复用另一个实例的 `GH_CONFIG_DIR`。
+
+## 4. 硬约束现状（发布收尾）
 
 | 约束 | 结果 |
 |---|---|
 | `pnpm typecheck` | ✅ 通过 |
 | `pnpm build` | ✅ 通过 |
-| `vitest` | ✅ **1177 passed / 48 skipped / 0 failed** |
-| 桌面应用 | ✅ `setup: null`、`runtime: ready` |
-| 提交与推送 | ✅ 仓库 `d2ecff7`，工作区干净 |
+| `vitest` | ✅ **1184 passed / 48 skipped / 0 failed** |
+| 桌面应用 | ✅ `setup: null`、`runtime: ready`、`router: one Router Session` |
+| 提交与推送 | ✅ 仓库 `79444ed`，工作区干净 |
 
 ## 5. 与上游的关系（不变）
 
@@ -65,25 +76,21 @@
 一条评论/新开 issue。看日志与路由：该 Thread 的候选只出现在其分片 Session 里，主 Router 不接它；同一 Thread 的第二条
 事件必须落同一分片。智能体账号不能自己触发自己（设计约束），所以这一步无法用本机脚本完成。
 
-## 7. P1 手动验收步骤（需要人在 DSH-Superagent 窗口里操作）
+**验收结果（2026-11-01）**：✅ 通过。用 `WEAaaa-sudo` 的非 @ 评论完成了上面的检查，结果见 §3 的 P2 段落。
 
-自动化的 API 没有「向主会话发一条消息」的入口，所以下面这三条只能人工确认。已开启 `asyncSubagents: true` 的实例上：
+## 7. P1 手动验收步骤（已失效，仅存档）
 
-1. 在对话里说：「用 subagent_background 跑一个慢任务：先睡 25 秒，再报告 1 到 100 的和；启动后立刻告诉我『父会话仍然可用』，不要等它。」
-2. **验收 A（Started 立即返回）**：工具结果应立刻返回 `{ status: "started", subagent: "...", session: "..." }`，而不是等到 25 秒后。
-3. **验收 B（运行期间父会话可响应）**：紧接着再发一句「现在几点了？」，应在子任务跑完之前就有回复。
-4. **验收 C（结果以事件消息回投）**：约 25 秒后，父会话收到一条以 `[background subagent ... finished]` 开头的消息，内容是 5050。
-5. **验收 D（cancel 不投递）**：再启动一个慢任务，然后立刻说「取消它」；之后不应收到任何 finished 消息，工具 `subagent_cancel` 应返回 `{ cancelled: true }`。
-6. **验收 E（Session 不泄漏）**：在侧栏确认多出的子会话在完成后不再活跃；进程重启后不残留。
-
-任一条不符合即为缺陷，先修再继续 P2。
+这一段原本写给「等 `asyncSubagents: true` 后人工验收五个断言」。P1 退役后 `subagent_background` / `subagent_cancel`
+两个工具已从代码里删除，照做会找不到工具。异步子任务的验收改为直接看 DSH 自带的 `subagent`（它在会话里以
+`ctx.subagent` 方式提供，后台运行由上游实现）。无需再执行本节步骤。
 
 ## 8. 最终状态
 
 | 项 | 状态 |
 |---|---|
-| P1 异步子任务（§4.1 右半边） | ⛔ 已退役，上游已提供（§7 证据） |
-| P2 Router 分片（§2.1） | ✅ 放置/预置/分发已接线（默认 1），⏳ 人工验收（§6） |
+| P1 异步子任务（§4.1 右半边） | ⛔ 已退役，上游已提供（`docs/017` §4/§7 证据） |
+| P2 Router 分片（§2.1） | ✅ 放置/按需创建/分发已接线（默认 1），并通过真实事件验收（§3、§6） |
 | P3 Watchdog 深化（§6） | ✅ 完成并实测 |
 | P4 状态存储接缝（§5） | ✅ 完成，行为零变化 |
 | 硬约束 | typecheck / build / vitest / 应用健康 全部保持 |
+| 发布 | ✅ `v0.1.0` 已发布（zip 与安装器校验和一致），见 `docs/020` |
