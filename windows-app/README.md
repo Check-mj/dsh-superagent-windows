@@ -15,7 +15,7 @@ No browser tab, no installer, no admin rights.
 | --- | --- |
 | **Desktop shortcut** (primary) | `%USERPROFILE%\Desktop\DSH-Superagent.lnk` |
 | Start Menu shortcut | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Superagent\Superagent.lnk` |
-| Portable launcher (`.cmd`, fallback) | `D:\1111\superagent-app\启动 Superagent.cmd` |
+| Portable launcher (`.cmd`, fallback) | `D:\1111\superagent-app\启动 DSH-Superagent.cmd` |
 | Portable executable | `D:\1111\superagent-app\Superagent\Superagent.exe` |
 
 Both shortcuts start:
@@ -59,7 +59,7 @@ D:\1111\superagent-app\
 ├─ main.js                      app source (the only code file)
 ├─ icon.png / icon.ico          window + shortcut icon
 ├─ build-portable.js            rebuilds Superagent\ from node_modules\electron\dist
-├─ 启动 Superagent.cmd           launcher that passes the required flags
+├─ 启动 DSH-Superagent.cmd           launcher that passes the required flags
 ├─ verification\                test evidence (logs + panel screenshot)
 └─ README.md                    this file
 ```
