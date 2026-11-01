@@ -153,6 +153,7 @@ tests/           单元与面板测试（文档与代码一致性也在其中）
 | [`docs/018`](docs/018-delivery-state.md) | 交付状态与验收清单 |
 | [`docs/019`](docs/019-video-script.md) | 发布视频脚本（分镜 + 旁白） |
 | [`docs/020`](docs/020-release-checklist.md) | 发布检查清单：发布前逐项验证与回滚 |
+| [`docs/021`](docs/021-feature-evidence.md) | 功能 ↔ 代码 ↔ 测试 ↔ 实测证据对照（发布前的自我审查） |
 
 ## 常见问题
 
