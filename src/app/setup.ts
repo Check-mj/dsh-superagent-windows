@@ -98,6 +98,10 @@ export class Setup {
     // Several GitHub Sources are describable now (an instance names its kind), but one deployment is still resolved
     // per process: refusing is better than silently serving one repository with another instance's account.
     const ids = instancesOf(settings, 'github')
+    // One Super-agent instance serves one context boundary (article §8.3): repositories that must not share memory,
+    // policy or credentials get their own instance, not another Source in this process. Serving several here would
+    // share one Router memory and one credential helper between them, which is the opposite of the design.
+    if (ids.length > 1) throw new SetupError('multipleSourcesUnsupported', { sources: ids.join(', ') })
     const [githubId = 'github'] = ids
     this.resolvedId = githubId
     // Every instance is checked, so one broken account cannot hide behind a healthy one. Several repositories are

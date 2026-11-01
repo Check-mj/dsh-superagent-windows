@@ -42,7 +42,9 @@ export function sourceContextOf(deps: SourceContextDeps, kind: { kind: string; h
   // problem follow the instance rather than the process. With one instance the instance is the kind and nothing changes.
   const scope = instance ?? kind.kind
   const health = deps.sources.instanceHealth(kind, scope)
+  const statePrefix = scope === kind.kind ? '' : `${scope}:`
   return {
+    source: scope,
     get deployment() { return deps.deploymentFor ? deps.deploymentFor(scope) : deps.deployment },
     commands: deps.commandsFor ? deps.commandsFor(scope) : deps.commands,
     ready: deps.ready,
@@ -58,9 +60,11 @@ export function sourceContextOf(deps: SourceContextDeps, kind: { kind: string; h
     receive: trigger => deps.receive(trigger),
     atomic: work => store.atomic(work),
     state: {
-      get: name => store.get(name),
-      set: (name, value) => { if (value === undefined) store.delete(name); else store.set(name, value) },
-      keys: prefix => store.keys(prefix),
+      // A Source's own state follows its instance: cursors, retry tables and stream positions must not be shared, or one
+      // instance would read another's items through the wrong repository scope. The default instance keeps the bare keys.
+      get: name => store.get(statePrefix + name),
+      set: (name, value) => { const key = statePrefix + name; if (value === undefined) store.delete(key); else store.set(key, value) },
+      keys: prefix => store.keys(statePrefix + prefix).map(key => key.slice(statePrefix.length)),
     },
     threads: {
       get: key => store.threads.get(key),

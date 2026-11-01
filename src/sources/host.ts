@@ -29,6 +29,8 @@ export interface SourceHost {
 export interface ThreadDescription { label?: string; url?: string; facts?: Record<string, ThreadFact | null> }
 /** Application capabilities exposed to a Source kind for reading state, ingesting triggers, managing threads/tickets, and reporting health. */
 export interface SourceContext {
+  /** This instance's Source id: the kind for its default instance, otherwise the configured instance id. */
+  readonly source: string
   readonly deployment: Deployment
   readonly commands: Commands
   readonly ready: Promise<void>
