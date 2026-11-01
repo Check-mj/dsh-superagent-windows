@@ -6,7 +6,8 @@
 
 ```powershell
 pnpm release:check
-# 或：powershell -NoProfile -ExecutionPolicy Bypass -File scriptselease-check.ps1
+# 或：powershell -NoProfile -ExecutionPolicy Bypass -File scripts
+elease-check.ps1
 ```
 
 自动检查：工作区干净且已推送、归属标注齐全（README/NOTICE/LICENSE/locale/package）、CHANGELOG 有该版本、
@@ -74,3 +75,37 @@ pnpm release:check
 1. 不删除 Release，改为**编辑说明**标注问题并置 `prerelease`
 2. 修复后发 `v0.1.1`；`install.ps1` 的默认 `$Version` 与 `$checksums` 一起更新
 3. 已安装用户：重新跑一行安装命令即可覆盖应用文件；状态目录与配置不受影响
+
+## 发布执行步骤（照做）
+
+```powershell
+# 0. 确认要发布的版本与改动都在 main 上
+git status --short            # 必须为空
+git log --oneline -5
+
+# 1. 全量彩排（12 项）——不绿就不要发
+pnpm release:check
+
+# 2. 打包
+node windows-app/build-portable.js
+#    把 payload 打成 zip（含 Superagent/、install.ps1、INSTALL.md），记录 SHA-256
+#    Compress-Archive -Path windows-app\Superagent,windows-app\install.ps1,windows-app\INSTALL.md `
+#      -DestinationPath DSH-Superagent-<ver>-win-x64.zip -CompressionLevel Optimal
+#    (Get-FileHash DSH-Superagent-<ver>-win-x64.zip -Algorithm SHA256).Hash.ToLower()
+
+# 3. 把新校验值写进一行安装器
+#    编辑 install.ps1 的 $checksums['<ver>']，然后提交推送
+
+# 4. 创建/更新 Release 并上传资产（用 API，oauth 缺 workflow 权限时 gh release create 会失败）
+gh api repos/<repo>/releases -X POST -f tag_name=v<ver> -f name="DSH-Superagent v<ver>" --raw-field body="<notes>"
+gh api --method POST -H "Content-Type: application/zip" --input <zip> "<upload_url>?name=<zip>"
+gh api --method POST -H "Content-Type: text/plain" --input <sha> "<upload_url>?name=<zip>.sha256"
+
+# 5. 再跑一次彩排，确认资产 digest 与安装器校验值一致
+pnpm release:check -SkipTests
+
+# 6. 人工确认（彩排覆盖不到的部分）
+#    启动应用：setup 正常、面板「介绍」可打开、一行安装能在干净目录装好
+```
+
+> 若发布后发现问题：不改历史，发下一个补丁版本；旧 Release 可置为 prerelease 并在说明顶部标注原因。

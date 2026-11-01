@@ -45,6 +45,28 @@ First publishable Windows adaptation.
 - The installer no longer hangs when the application is running (it refuses, and robocopy retries are bounded).
 - GitHub polling, source state and per-instance credentials are isolated per instance.
 
+### Fixed in the second pass (before announcement)
+- The installer no longer breaks on an install root containing a space (a user name such as `John Doe` was enough):
+  the copy is quoted and verified, and the installer fails loudly instead of writing only `paths.json`.
+- A backend left over from a window that was closed while it ran used to keep the state lock, so the next launch died
+  with "Lock file is already being held" and the panel never connected. The shell now clears orphan backends of its own
+  instance before starting, and the startup-failure page offers 重新启动后端.
+- The backend token is no longer written to `app.log` (only the origin is), and an `unhandledRejection` handler keeps a
+  rejected promise from disappearing.
+- The panel header and sidebar entry read DSH-Superagent everywhere (the shell title, the About dialog and the plugin
+  page already did).
+
+### Added in the second pass
+- `pnpm release:check` / `scripts/release-check.ps1`: the release rehearsal in one command — clean tree and pushed
+  branch, attribution in every place, a changelog section, typecheck/build/tests, and the published release's asset
+  digest matching the checksum the one-line installer verifies.
+- `tests/portability.spec.ts` and `tests/release-invariants.spec.ts`: no tracked file may name the development machine,
+  and attribution, the changelog, the package id and the absence of credential shapes are locked by tests.
+- The panel's guide page explains the four stages plus Settings, links both repositories and the delta file, and carries
+  the first four steps and three usage notes.
+- `docs/019` turned into a recording runbook (pre-flight, shot-by-shot table, file conventions, self-check, fallbacks),
+  and `docs/020` is the release checklist with a publisher command sequence.
+
 ### Known limitations
 - Compute/state separation (article §5) is not implemented; a stopped process stays stopped, so an external
   scheduled check is still the outermost guard.
