@@ -151,3 +151,17 @@
 3. `Commands` / `links` / `pullEndNotices` / `ticketEnvironment` 全部按工单或实例的 source 取 deployment
 4. 先放行「同账号多仓库」；不同账号留到 C3（`GH_CONFIG_DIR` 按实例）
 5. 验收：两仓库各自 `setup: null`、触发互不串、A 账号失效时 B 仍 `ready`
+
+### 实施状态（C2 进行中）
+
+已完成并提交：
+
+- `Setup` 按实例保存 deployments 与 setup problems（`deploymentFor` / `problemFor`）
+- `SourceContext` 的 deployment / commands / 健康条目 / setup problem 全部按实例解析
+- 入口插件按 `instances()` 为每个实例启动一个循环；健康条目名带实例后缀（`github:<id>`）
+- setup 逐个校验实例；**不同账号**明确拒绝（`multiAccountUnsupported`），同账号多仓库放行
+- 工单环境变量与合并通知按工单自己的 source 取 deployment
+- 声明式配置改变实例集合时自动重启一次
+
+**已知未解决**：第二个实例的健康条目停在 `starting`，即它的轮询循环没有开始回报（首个实例正常）。setup 为 `null`、两个 Source 都列出且状态 `ready`，因此不会串仓库；但第二个实例收不到触发。修复前线上配置保持单实例。
+

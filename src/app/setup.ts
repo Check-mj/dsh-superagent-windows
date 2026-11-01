@@ -97,11 +97,20 @@ export class Setup {
     const probe = this.probe()
     // Several GitHub Sources are describable now (an instance names its kind), but one deployment is still resolved
     // per process: refusing is better than silently serving one repository with another instance's account.
-    const deployments = instancesOf(settings, 'github')
-    if (deployments.length > 1) throw new SetupError('multipleSourcesUnsupported', { sources: deployments.join(', ') })
-    const [githubId = 'github'] = deployments
+    const ids = instancesOf(settings, 'github')
+    const [githubId = 'github'] = ids
     this.resolvedId = githubId
-    const deployment = await resolveDeployment(machine, settings.sources[githubId]?.config, probe)
+    // Every instance is checked, so one broken account cannot hide behind a healthy one. Several repositories are
+    // served as long as they share one agent account: the worker environment holds a single credential helper until
+    // per-instance accounts land (C3), and serving two accounts through one would be worse than refusing.
+    const deployments = new Map<string, Deployment>()
+    for (const id of ids.length ? ids : ['github']) {
+      deployments.set(id, await resolveDeployment(machine, settings.sources[id]?.config, probe))
+    }
+    const logins = new Set([...deployments.values()].map(item => item.github.login))
+    if (logins.size > 1) throw new SetupError('multiAccountUnsupported', { accounts: [...logins].join(', ') })
+    for (const [id, item] of deployments) this.deployments.set(id, item)
+    const deployment = deployments.get(githubId)!
     const feishu = await resolveFeishuBot(machine, settings.sources.feishu?.config, probe).catch((error: unknown) => {
       if (!(error instanceof SetupError)) throw error
       this.feishuProblem = error.problem

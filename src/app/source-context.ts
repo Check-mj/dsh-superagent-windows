@@ -38,10 +38,10 @@ export interface SourceContextDeps {
  */
 export function sourceContextOf(deps: SourceContextDeps, kind: { kind: string; health: readonly string[] }, instance?: string): SourceContext {
   const { store } = deps
-  const health = deps.sources.healthEntries(kind.health)
-  // Every context carries the instance it belongs to, so a deployment, its Commands and its setup problem follow the
-  // instance rather than the process. With one instance the instance is the kind itself and nothing changes.
+  // Every context carries the instance it belongs to, so a deployment, its Commands, its health entries and its setup
+  // problem follow the instance rather than the process. With one instance the instance is the kind and nothing changes.
   const scope = instance ?? kind.kind
+  const health = deps.sources.instanceHealth(kind, scope)
   return {
     get deployment() { return deps.deploymentFor ? deps.deploymentFor(scope) : deps.deployment },
     commands: deps.commandsFor ? deps.commandsFor(scope) : deps.commands,

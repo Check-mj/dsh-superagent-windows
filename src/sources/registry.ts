@@ -13,6 +13,8 @@ import type { ChannelLink, ChannelLinks, SourceInstance, SourceKind, TriggerCont
 export class SourceRegistry implements SourceScope {
   private readonly kinds = new Map<string, SourceKind>()
   private readonly health = new Map<string, HealthEntry>()
+  /** Per-instance health entries, keyed by instance id, for instances whose id is not their kind. */
+  private readonly instanceEntries = new Map<string, Map<string, HealthEntry>>()
   constructor(private readonly settings: () => Settings, private readonly board: Pick<HealthBoard, 'claim'> = new HealthBoard(),
     private readonly registered: (kind: SourceKind) => () => void = () => () => {}) {}
 
@@ -43,6 +45,19 @@ export class SourceRegistry implements SourceScope {
   /** The kind an instance id belongs to; an id that names no kind falls back to itself (`github` → `github`). */
   private kindId(settings: Settings, id: string): string { return sourceKindOf(id, settings.sources[id]) }
   kind(id: string): SourceKind | undefined { return this.kinds.get(this.kindId(this.settings(), id)) }
+  /**
+   * Health entries for one instance: the kind's own names for its default instance, suffixed with the instance
+   * otherwise, so two instances of one kind do not overwrite each other's state. Claimed once and reused.
+   */
+  instanceHealth(kind: { kind: string; health: readonly string[] }, instance: string): Map<string, HealthEntry> {
+    if (instance === kind.kind) return this.healthEntries(kind.health)
+    const cached = this.instanceEntries.get(instance)
+    if (cached) return cached
+    const entries = new Map<string, HealthEntry>()
+    for (const name of kind.health) entries.set(name, this.board.claim(`${name}:${instance}`, { state: 'starting', detail: '' }))
+    this.instanceEntries.set(instance, entries)
+    return entries
+  }
   /** Every registered kind's instance ordered by ID, followed by stored instances whose kind is not installed (with their config kept as stored). */
   instances(settings = this.settings()): (SourceInstance & { installed: boolean })[] {
     const byKind = [...this.kinds.values()].sort((a, b) => a.kind.localeCompare(b.kind))

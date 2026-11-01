@@ -151,7 +151,7 @@ export class Runtime extends Service implements SourceHost {
           const ended = event.type === 'ticket.ended' ? store.tickets.get(event.data.ticketId) : undefined
           if (ended && setup.configured()) {
             const request = store.triggers.get(ended.origin.triggerId)?.text ?? ''
-            for (const message of pullEndNotices(ended, request, setup.deployment.repository)) outbox.send(message)
+            for (const message of pullEndNotices(ended, request, setup.deploymentFor(ended.channels[0]?.source).repository)) outbox.send(message)
           }
         } })
       // Update the `evals` health entry on every pass if an evaluation failed as unavailable within the last hour.
@@ -196,7 +196,8 @@ export class Runtime extends Service implements SourceHost {
   ticketEnvironment(ticket: Ticket): Variable[] {
     const trigger = sourceTrigger(this, ticket)
     const { setup: { deployment }, sources } = this
-    return ticketEnvironment({ deployment, sources, settings: this.store.settings(), ticket, ...trigger ? { trigger } : {} })
+    // The variables follow the ticket's own Source, so a ticket from the second repository carries that repository.
+    return ticketEnvironment({ deployment: this.setup.deploymentFor(ticket.channels[0]?.source), sources, settings: this.store.settings(), ticket, ...trigger ? { trigger } : {} })
   }
   checkSetup(): void { this.setup.check() }
   receive(trigger: Trigger): ReceiveResult { return this.passes.receive(trigger) }
@@ -237,8 +238,17 @@ export class Runtime extends Service implements SourceHost {
     const result = loadDeclarative(path, current)
     if ('error' in result) { this.ctx.logger.warn('dsh-superagent: %s', result.error); return }
     if (JSON.stringify(result.settings) === JSON.stringify(current)) return
+    const before = instancesOf(current, 'github').join(',')
+    const after = instancesOf(result.settings, 'github').join(',')
     this.store.saveSettings(result.settings, { source: 'internal', policyVersion: '', policyChanged: false, notified: [] })
     this.ctx.logger.info('dsh-superagent: applied the declarative settings in %s', path)
+    // A Source's polling loop is started when its plugin mounts, which happens before this file is applied. A changed set
+    // of instances therefore needs one restart, exactly like a changed account: otherwise a Source added here would be
+    // listed but never poll, and one removed here would keep polling.
+    if (before !== after) {
+      this.ctx.logger.info('dsh-superagent: the declarative settings changed the Source instances (%s -> %s); restarting to mount them', before, after)
+      this.setup.restart()
+    }
   }
   private httpHost(): HttpHost {
     const runtime = this
