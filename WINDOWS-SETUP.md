@@ -545,11 +545,12 @@ gh api users/<agent-login> --jq '{login: .login, id: .id}'
 - **运行期不依赖 PATH**：面板里填的是这个 `.exe` 的绝对路径（6.7），插件只按这个路径调用它。
 - **建议同时加入当前用户 PATH**（2.4）：方便你手动登录/自查，也让桌面应用的自动探测能找到它（应用也可以用它自带的 `tools\gh\bin`，或用 `SUPERAGENT_GH_DIR` 指定）。
 
-### 6.4 机制：用 `GH_CONFIG_DIR` 选择智能体账户
+### 6.4 两种受支持的账号模型（推荐 (a)）
 
-**Windows 上面板"智能体的 GitHub CLI"必须填真正的 `gh.exe` 绝对路径，绝不能填 `.cmd`。** 实测：Node 26 在 Windows 上 spawn 一个 `.cmd` 会直接抛 `EINVAL`（CVE-27980 之后的加固），裸命令名也不会解析到 `.cmd`。所以上游"用包装脚本换账号"的办法在 Windows 上行不通。
+面板"智能体的 GitHub CLI"支持两种写法，二选一即可：
 
-移植版改用 **`GH_CONFIG_DIR`**，由插件在两处注入：
+**(a) 推荐：CLI = 真实 `gh.exe` 的绝对路径，账号由插件的 `GH_CONFIG_DIR` 选中（配置最少）。**
+插件在两处注入 `GH_CONFIG_DIR=<stateDir>\gh-config`：
 
 - `src/infra/environment.ts` 的 `agentVariables()`：给 worker 环境（以及插件进程）注入 `GH_CONFIG_DIR=<stateDir>\gh-config`；
 - `src/deployment.ts` 的 `workerProbe()`：账号检查也显式传同一个 `GH_CONFIG_DIR`（因为检查发生在 `applyEnvironment()` 之前）。
@@ -560,14 +561,20 @@ gh api users/<agent-login> --jq '{login: .login, id: .id}'
 智能体的 gh 配置目录 = %USERPROFILE%\.dsh\state\superagent\gh-config
 ```
 
-> 这个目录**由插件拥有**（`<stateDir>` 下、启动时创建），当前版本叫 `gh-config`；应用本身从不设置 `GH_CONFIG_DIR`。
+**(b) 兼容：CLI = 你自己的 `gh-agent.cmd` 包装器（上游文档的模型）。**
+包装器设置 `GH_CONFIG_DIR` 后调用真实 `gh.exe`。Windows 上 Node 不能直接 spawn `.cmd`（CVE-2024-27980 之后抛 `EINVAL`），但移植版 `runAsWorker()` 会检测 `.cmd`/`.bat` 并改用
+`cmd.exe /d /c <程序> <参数…>`，且**程序与参数作为分开的 argv 传入**（把整行拼成一个字符串会让 cmd 二次解析引号，目标程序收到的是 `\"…\"` 而不是 `"…"`）。所以包装器作为面板 CLI 完全可用。
+
+两种模型都**不需要 `gh` 在 PATH 上**；写绝对路径（或 `.cmd` 的绝对路径）即可，不要依赖裸命令名。
+
+> `gh-config` 目录**由插件拥有**（`<stateDir>` 下、启动时创建），当前版本叫 `gh-config`；应用本身从不设置 `GH_CONFIG_DIR`。
 > 如果未来插件换了目录名，以 `<stateDir>` 下实际存在的那一个为准；第一次登录前没有它时，手动建一下或先启动一次后端即可。
 
 结果：setup 检查和每个 worker Session 读的都是**智能体**的 gh 配置，**你自己的 `gh` 登录不受影响、也不会被智能体使用**。
 
-### 6.5 创建包装器 `gh-agent.cmd`（仅用于登录/自查，不是面板 CLI）
+### 6.5 创建包装器 `gh-agent.cmd`（模型 (b) 的 CLI；也可只用于登录/自查）
 
-包装器只是给你手动用的便利工具；**不要把它填进面板**（原因见 6.4）。在 `%USERPROFILE%\bin` 下创建：
+包装器有两个用途：走**模型 (b)** 时它就是面板里的 CLI；走**模型 (a)** 时它只是给你登录/自查用的便利工具。在 `%USERPROFILE%\bin` 下创建：
 
 ```powershell
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\bin" | Out-Null
@@ -579,10 +586,10 @@ notepad "$env:USERPROFILE\bin\gh-agent.cmd"
 ```bat
 @echo off
 setlocal
-rem dsh-superagent: sign in / verify the GitHub agent account (convenience only).
-rem The plugin itself selects the agent account through GH_CONFIG_DIR, so this file
-rem is NOT the configured CLI; it just saves you from exporting the variable by hand.
-rem gh.exe is called by ABSOLUTE path so a `gh` shim on PATH can never be re-entered.
+rem dsh-superagent: sign in / verify the GitHub agent account.
+rem May be used as the configured CLI (model b) or just for manual sign-in (model a).
+rem The plugin itself selects the agent account through GH_CONFIG_DIR.
+rem gh.exe is called by ABSOLUTE path so a `gh` shim on PATH is never involved.
 set "GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\superagent\gh-config"
 "C:\path\to\gh.exe" %*
 exit /b %ERRORLEVEL%
@@ -592,10 +599,11 @@ exit /b %ERRORLEVEL%
 | --- | --- |
 | `setlocal` | 不改动调用者窗口的环境 |
 | `set "GH_CONFIG_DIR=…"` | 指向插件给智能体准备的配置目录（token 存在该目录的 `hosts.yml`）。**必须与 `stateDir` 对应**；换 profile/stateDir 时这里也要改 |
-| `"…\gh.exe" %*` | 用**绝对路径**调用真正的 gh。虽然插件不会调用这个包装器，但 PATH 上可能有插件的 `gh.cmd` 垫片（它用插件注入的 `GH_CONFIG_DIR`/账号去调真实 gh）；按名字调用会命中垫片而不是你包装器里的配置。绝对路径保证始终调到你指定的那个 `gh.exe` |
+| `"…\gh.exe" %*` | 用**绝对路径**调用真正的 gh，参数原样传递。绝对路径确保调用的是你指定的那个 `gh.exe`，不受 PATH 上任何垫片/包装器影响 |
 | `exit /b %ERRORLEVEL%` | 原样传递退出码 |
 
 > gh 装在别处（winget/官方 MSI）时，只改调用 `gh.exe` 的那一行；路径带空格也没问题（引号已验证）。
+> 走模型 (b) 时，面板里填这个 `.cmd` 的**绝对路径**；走模型 (a) 时不要把它填进面板。
 
 ### 6.6 登录智能体账户
 
@@ -649,7 +657,7 @@ set "GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\superagent\gh-config"
 
 | 字段 | 填什么 |
 | --- | --- |
-| **智能体的 GitHub CLI** | **`gh.exe` 的绝对路径**，例如 `C:\path\to\gh.exe`（装了官方 CLI 就填它自己的路径）。**必须是 `.exe`** |
+| **智能体的 GitHub CLI** | **推荐**：`gh.exe` 的绝对路径（例如 `C:\path\to\gh.exe`）；**兼容**：你自己的 `gh-agent.cmd` 的绝对路径（模型 (b)，见 6.4） |
 | **监听的仓库** | `<owner>/<name>` |
 
 - 保存时插件用它去查账号和推送权限，**通过后会自动重启一次后端**（见 7.5）。
@@ -679,7 +687,7 @@ GitHub 卡片里填：
 | 字段（面板中文） | 填什么 | 说明 |
 | --- | --- | --- |
 | **监听的仓库** | `<owner>/<name>` | 只支持 github.com，不支持 GitHub Enterprise Server |
-| **智能体的 GitHub CLI** | `C:\path\to\gh.exe`（**绝对路径，必须是 `.exe`**；装了官方 CLI 就填它自己的路径） | 见 6.4/6.7；保存时校验账号 + 推送权限。**绝对不能填 `.cmd`**（Node spawn `.cmd` 报 `EINVAL`） |
+| **智能体的 GitHub CLI** | 推荐 `C:\path\to\gh.exe`（绝对 `.exe`）；兼容你自己的 `gh-agent.cmd` 绝对路径（模型 (b)） | 见 6.4/6.7；保存时校验账号 + 推送权限。`.cmd` 会被移植版通过 `cmd.exe /d /c` 以分开的 argv 参数执行（见 6.4） |
 | 接收仓库里的新 Issue / 新 PR / 评论 / 默认分支的 CI | **先全部关闭** | 打开后会收到"没有 @ 智能体"的事件，交给策略的接收表判断；新手先关，减少噪音 |
 | 轮询间隔 / 秒（Advanced） | 默认 60 | GitHub 要求更长时以 GitHub 为准 |
 | 连续失败几次后报告异常（Advanced） | 默认 3 | 单次网络抖动会在下次轮询自愈 |
@@ -995,6 +1003,8 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 
 ## 9. 第一次跑通
 
+> 这条链路在本机已经**端到端跑通过一次**（issue 评论 → Ticket → 执行器 → PR #5），实测记录见 12.1。下面是给新环境的操作步骤。
+
 ### 9.1 先决检查
 
 1. `status` 语义上健康（CLI：退出码 0；或应用窗口能打开面板且 Overview 没有红色 setup 项）。
@@ -1042,9 +1052,9 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 
 | 症状（英文原文 / 中文面板） | 原因与处理 |
 | --- | --- |
-| `The agent GitHub CLI is not set.` / 没有设置智能体的 GitHub CLI | Sources 里填 **`gh.exe` 的绝对路径**（7.2） |
+| `The agent GitHub CLI is not set.` / 没有设置智能体的 GitHub CLI | Sources 里填 CLI 的绝对路径（推荐 `gh.exe`，或你自己的 `gh-agent.cmd`；见 7.2） |
 | `The agent GitHub CLI was not found.` / 找不到智能体的 GitHub CLI | 路径写错、文件不在、或带空格没加引号。`Test-Path 'C:\path\to\gh.exe'` 自查 |
-| `The agent GitHub CLI cannot read its account` / 读不到账号 | 智能体的 gh 配置目录里还没有登录：按 6.6 用 `GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\superagent\gh-config` 登录后再保存；并确认面板 CLI 填的是 **`gh.exe` 绝对路径**（不是 `.cmd`） |
+| `The agent GitHub CLI cannot read its account` / 读不到账号 | 智能体的 gh 配置目录里还没有登录：按 6.6 用 `GH_CONFIG_DIR=%USERPROFILE%\.dsh\state\superagent\gh-config` 登录后再保存；确认面板 CLI 指向的 `gh.exe`/`.cmd` 用的是同一个 `GH_CONFIG_DIR` |
 | `The agent GitHub CLI did not report a GitHub account` | CLI 输出被别的东西污染（比如 gh 升级提示）。在终端里用同一个 `GH_CONFIG_DIR` 跑一次 `gh.exe api user --jq .login`，看原始输出 |
 | `@x cannot read <repo>` / `@x cannot push to <repo>` | 给智能体账户 Write 权限、接受邀请、组织 SSO 授权 |
 | `The GitHub Source names no repository.` | 填 `owner/name` |
@@ -1060,7 +1070,8 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | 症状 | 原因与处理 |
 | --- | --- |
 | 工单显示 `The prepare command failed: …` | 输出就是原因：clone 路径不对、git 不在 PATH、refspec 无效、目录已存在等。修好命令后 **Retry 工单** |
-| 准备命令报 `non-fast-forward` / `invalid refspec` | 多半是同一张工单重试时残留了旧 ref。先清：`git -C "%USERPROFILE%\src\widgets" update-ref -d refs/dsh-superagent/<ticket-id>`（✅ 实测该命令有效），再 Retry |
+| 工单立即失败：`The prepare command failed: sh: line 1: C:UsersChen…: command not found` | 旧构建的 bug：prepare 走了 `sh -c`（Windows 没有 sh，且 POSIX shell 会吃掉 Windows 路径里的反斜杠）。移植版已改为 `cmd.exe /d /s /c`；更新插件并重建（13.3）后重试工单 |
+| 准备命令报 `non-fast-forward` / `invalid refspec` | 多半是同一张工单重试时残留了旧 ref。先清：`git -C "$env:USERPROFILE\src\widgets" update-ref -d refs/dsh-superagent/<ticket-id>`（✅ 实测该命令有效），再 Retry |
 | 工单目录是空的、worktree 没建出来 | 准备命令留空了；或命令成功了但 `DSH_SUPERAGENT_DIR` 用错（不要在命令里自己再拼路径） |
 | `The git configuration of the repository in … sets credential…` | 本地 clone 的 `.git/config` 里有凭据或 `http.*.extraheader`；按 7.4.1 清掉 |
 | 执行器长时间卡住 | 看 Overview 的 `models`/`worker` 健康项；可能是模型 provider 重试；也看是否在等审批（不应发生，preset 是 `approval: never`） |
@@ -1082,6 +1093,9 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | 错误页"找不到 Node.js 或 DeepSeek Harness" | 应用只认 `C:\Program Files\nodejs\node.exe` 或 `where node`，以及 `%APPDATA%\npm\node_modules\@deepseek-ai\dsh\lib\bin.js`；用 `SUPERAGENT_NODE` / `SUPERAGENT_DSH_BIN` 覆盖，或装好 |
 | `EADDRINUSE … 3082` | **CLI 路径**下：已经有一个后端（应用或 CLI）占着 3082。`Get-NetTCPConnection -LocalPort 3082` 查 PID；停掉多余的实例。应用路径下出现它，说明 overlay 没生效（检查 `<userData>\runtime.patch.yml` 是否被生成） |
 | `start` 报 `Lock file is already being held` | 同一个 `stateDir` 已经有后端在跑（可能正是应用窗口里的那份）。这是正常的单实例保护：先确认/停止已有实例，不要同时开两个 |
+| 后端被强杀过后启动失败：仍报 `Lock file is already being held`，且 Source 显示 **Off (`sourceOff`)** | 被强杀的后端留下了陈旧的锁。**先确认进程已停**，再删除 `%USERPROFILE%\.dsh\state\superagent.lock`，然后重新启动后端 |
+| 关掉再打开应用后，Source 变成禁用/`Off`，或 setup 又说没仓库/没 CLI | 检查 **设置 → 来源 → GitHub** 的启用开关与两个字段（仓库 `owner/name`、CLI 绝对路径）——实测遇到过 `repository`/`cli` 被写成空串的情况，重新填上并保存即恢复 |
+| 启动失败日志出现 `tools.restrict() names unknown global tool "bash"` | 旧构建的 bug：主 Session 硬编码了 `bash` 工具名，而 Windows profile 没有它，`tools.restrict()` 拒绝未知名字导致插件不激活。移植版已改为从**实时工具注册表**取可用工具；更新并重建后即可 |
 | `stop` 报"无法通知/无法停止"且不发强杀 | 该服务不是由**当前版本**的 `start` 启动的（没有预加载 `scripts\dsh-service-hook.mjs`），所以命名管道收不到。用 `start` 重启一次即可恢复可停性 |
 | 3082 被一个"装了插件但没启动"的 dsh 占着：`/` 返回 401、`/orchestrator/api/state` 返回 404 | 那是另一个 dsh 实例（没加载 dsh-superagent）。CLI `start` 会绑定失败；停掉它，或改 superagent 的端口（4.3/4.5） |
 | 启动日志出现 `unknown option '--patch'` | `--patch` 是**启动器参数**，必须写在 `--no-open` 等应用参数之前：`--profile superagent --patch <file> --no-open` |
@@ -1103,14 +1117,15 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 ## 11. Windows 移植与上游的差异
 
 > 这是**操作者视角**的摘要。完整的逐处清单、冲突处理预案与升级判定标准以 `<checkout>\WINDOWS-DELTA.md` 为准；应用安装布局与路径解析顺序以 `<checkout>\windows-app\INSTALL.md` 为准。两份文档与本节冲突时，以它们为准。
+> 仓库状态（可引用）：`origin` = `Check-mj/dsh-superagent-windows`，`main` 当前 `a3156c7`（'turn the three shortcuts into proper fixes'），`upstream` = 官方原型仓库；`WINDOWS-DELTA.md` 的 §3.4 记录 E2E 才暴露的两处缺陷、§3.5 记录 batch 包装器参数传递；契约测试 `tests/windows-port.spec.ts` 2 条全绿（batch shim + PATH 剥离 + `.cmd` 包装器精确传参）。
 
 | # | 上游（POSIX） | Windows 移植后的行为 | 状态 |
 | --- | --- | --- | --- |
 | 1 | `scripts/dsh-superagent start` 用 **tmux** 会话，`stop` 发 SIGINT | 入口 **`scripts\dsh-superagent.cmd`**（批处理，不是 `.ps1`）；Windows 用 `CREATE_NO_WINDOW` 分离启动、`service.pid` 记录、**命名管道 → SIGINT 钩子**（`scripts\dsh-service-hook.mjs`，`node --import` 预加载）优雅停止；不注册服务、不强杀；退出码 0/1/2/3 不变 | ✅ 负责人端到端实测（含真实 dsh 退出码 130） |
-| 2 | 命令 shim 是 `#!/bin/sh` 无扩展名脚本 | 写成 **`<name>.cmd`**（`gh.cmd`、`lark-cli.cmd`、被禁命令 `<name>.cmd`）：`@echo off` + `@REM` 标记 + **绝对路径调用真实 CLI** + `%*` + `exit /b`；**不做 PATH 剥离**（绝对路径调用，无递归） | 🔧 源码确认 |
-| 3 | 准备命令 `sh -c <command>` | 改为 **`cmd.exe /d /s /c <command>`**；准备命令必须用 cmd 语法（`%VAR%`、`&&`），`sh.exe` **不需要** | 🔧 源码确认；✅ 用等价 `.cmd` 包装器实测通过 |
+| 2 | 命令 shim 是 `#!/bin/sh` 无扩展名脚本 | 写成 **`<name>.cmd`**（`gh.cmd`、`lark-cli.cmd`、被禁命令 `<name>.cmd`）：`@echo off` + `@REM` 标记 + **像上游一样先把自己从 PATH 里剥离**（比较 `%~dp0` 重建 PATH）+ 调用配置的 CLI；另用 `%*` 传参、`exit /b` 透传退出码。这样 worker 里按名字调 `gh` 会命中垫片，再转到真实二进制 | ✅ 实测 + 契约测试（PATH 剥离、参数转发） |
+| 3 | 准备命令 `sh -c <command>` | 改为 **`cmd.exe /d /s /c <command>`**（E2E 暴露：Windows 无 `sh`，且 POSIX shell 会吃掉路径里的反斜杠，报 `command not found`）；准备命令必须用 cmd 语法（`%VAR%`、`&&`），不需要 `sh.exe` | ✅ E2E 实测通过；见 WINDOWS-DELTA §3.4 |
 | 4 | 账号探测用 `env PATH=… <cli>` | Windows 没有 `env`，改为给子进程显式传 PATH 覆盖，并**显式传 `GH_CONFIG_DIR`**（修复了"账号检查早于环境注入"的顺序问题） | 🔧 源码确认 |
-| 5 | 智能体 CLI 用 `~/.local/bin/gh-agent` sh 包装器换账号 | **`.cmd` 包装器不能当 CLI**：Node 在 Windows 上 spawn `.cmd` 直接 `EINVAL`（CVE-27980 加固），裸名字也不解析到 `.cmd`。改为：面板 CLI = **`gh.exe` 绝对路径**，账号隔离由插件注入的 `GH_CONFIG_DIR=<stateDir>\gh-config` 完成；`gh-agent.cmd` 降级为**登录/自查的便利包装器** | ✅ 负责人已验证 `EINVAL`；🔧 源码确认注入 |
+| 5 | 智能体 CLI 用 `~/.local/bin/gh-agent` sh 包装器换账号 | **两种模型都支持**：(a) 面板 CLI = `gh.exe` 绝对路径，账号由插件注入的 `GH_CONFIG_DIR=<stateDir>\gh-config` 选中（推荐，最少配置）；(b) 面板 CLI = 自己的 `gh-agent.cmd`（上游文档模型）——`runAsWorker()` 检测 `.cmd`/`.bat` 后改用 `cmd.exe /d /c <prog> <args…>`，且**程序与参数分 argv 传入**（整行拼接会让 cmd 二次解析引号、目标收到 `\"…\"`）。上游"包装器当 CLI"的模型在 Windows 上重新成立 | ✅ (a) E2E 实测；(b) 契约测试 2 条绿 |
 | 6 | `stateDir` 必须是 `/` 开头的 POSIX 绝对路径 | 接受 `C:/…` 或 `D:\…`（正则放宽为 `^(?:[A-Za-z]:[\\/]|\/)`） | ✅ 修复后实测插件可激活 |
 | 7 | 用 `ps`/`fcntl`/`SIGINT`/`umask`/`chmod` | 分别换成：`OpenProcess`/`msvcrt` 字节锁/命名管道触发的 SIGINT 钩子/无 | 🔧 源码确认 |
 | 8 | `--port` 可改面板端口 | **profile 的 `webserver.port` 会覆盖 CLI 的应用参数**；要改端口必须改 patch 文件或加 `--patch` overlay（桌面应用就是这么做的）；且 **`--patch` 必须放在应用参数之前** | ✅ 实测（`--port 0` 仍撞 3082；`--no-open --patch` 报 unknown option） |
@@ -1121,6 +1136,8 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | 13 | 飞书 Source | 本机不启用（`dsh-superagent-feishu` 保持 disabled）；如启用需另配 `lark-cli.cmd` | — |
 | 14 | 无桌面应用（只有浏览器面板） | 新增 **`windows-app\` Electron 壳 + `install.ps1` 安装器**：构建产物 368 MB、装好 ≈500 MB（含自带 git+gh ≈133 MB）、可整体搬家、无管理员、注册表零残留；布局是 `<root>\Superagent.exe` + `resources\app\` + `config\paths.json` + `tools\`（可选）+ Electron 运行时，插件 checkout 由 `paths.json` 记录（不复制） | ✅ 安装器实跑 + 启动/渲染验收 |
 | 15 | 工具来自 PATH | 安装器壳按「显式覆盖 / 自带 `tools\` → PATH → 标准安装位置」探测 git/gh 并前置到后端子进程 PATH；自带 tools 优先于 PATH（自包含安装不被机器上别处副本顶掉）；缺失只警告不致命；覆盖变量 `SUPERAGENT_GIT_DIR` / `SUPERAGENT_GH_DIR` | ✅ 实跑：preflight 显示 `bundled tools` |
+| 16 | 主 Session 的工具列表按平台假设硬编码 | 改为从**实时工具注册表**过滤可用工具（E2E 暴露：硬编码 `bash` 在 Windows profile 里不存在，`tools.restrict()` 拒绝未知名字导致插件不激活）。副作用：Windows profile 若同时加载 bash 插件，两个 shell 都保留 | ✅ E2E 实测；见 WINDOWS-DELTA §3.4 |
+| 17 | `.cmd` 包装器无法作为被编程调用的 CLI | `runAsWorker()` 对 `.cmd`/`.bat` 走 `cmd.exe /d /c`，**程序与参数分开作为 argv**（不拼成一行）；契约测试覆盖 batch shim、PATH 剥离、`.cmd` 包装器精确参数转发 | ✅ 契约测试 2 条绿；见 WINDOWS-DELTA §3.5 |
 
 ---
 
@@ -1134,11 +1151,13 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | --- | --- |
 | 启动器 `scripts\dsh-superagent.cmd` 的 `start/status/stop/restart` 与四个退出码 | 移植负责人端到端跑过：`start` 起真实 dsh（带 `--import` hook、`--patch` overlay 换端口）→ API 应答 → `stop` 发 SIGINT → 进程以 **130** 退出；0/1/2/3 四种码都实际触发过 |
 | 优雅停止无强杀 | `stop` 约 0.7 秒返回，pidfile 删除；超时会报错而不是 `taskkill` |
-| 命令 shim 的 Windows 形式 | `worker-bin\<name>.cmd`：`@echo off` + `@REM` 标记 + **绝对路径调用真实 CLI** + `%*` + `exit /b`；Windows 上**不做 PATH 剥离**（绝对路径调用，无递归）；被禁命令 stderr + exit 1 |
+| 命令 shim 的 Windows 形式 | `worker-bin\<name>.cmd`：`@echo off` + `@REM` 标记 + **像上游一样把垫片目录从 PATH 里剥离**（比较 `%~dp0` 重建 PATH）+ 调用配置的 CLI + `%*` + `exit /b`。实测：垫片目录消失、其余 PATH 项保持不变；namespace 内按名字调 `gh` 会命中垫片再转到真实二进制。被禁命令 stderr + exit 1。契约测试 2 条覆盖 batch shim + PATH 剥离 + 参数转发 |
 | git 凭据助手 | `helper = !'<gh.exe 绝对路径>' auth git-credential` 经 Git for Windows 的 `sh` 执行；`GH_CONFIG_DIR` 在环境里时 `git credential fill` 返回智能体账号，不在时失败 |
 | `verifyEnvironment` 的逐字节比较在 Windows 上原样通过（实测） | `git config -z --show-origin --get-all credential.https://github.com.helper` 的真实输出是 `['file:C:\\…\\worker-gitconfig', "!'C:/…/gh.exe' auth git-credential", '']`，与期望的 `['file:' + workerGitConfig, credentialHelper(cli), '']` 完全一致 → **不会误报 `gitTooOld`**。前提：git 必须是自带 `sh.exe` 的发行版（Git for Windows / MinGit）。注意 `-z`：不带 `-z` 时 git 会 C-quote 路径（`file:"C:\\…"`），手工诊断看起来像不匹配 |
-| `.cmd` 不能被无 shell 地 spawn | Node ≥18.20/20.12 起（CVE-2024-27980）抛 `EINVAL`；所以面板 CLI 必须是 `.exe` |
-| 准备命令容器 | Windows 为 `cmd.exe /d /s /c <command>`；POSIX 仍 `sh -c`；Git for Windows 的 `sh.exe` 不在 PATH 上，POSIX 写法不能沿用 |
+| `.cmd` 作为 CLI（模型 (b)） | Node 确实不能直接 spawn `.cmd`（CVE-2024-27980，抛 `EINVAL`），但移植版的 `runAsWorker()` 检测到 `.cmd`/`.bat` 后用 `cmd.exe /d /c <prog> <args…>`，**程序与参数作为分开的 argv** 传入（整行拼接会被 cmd 二次解析引号，目标收到 `\"…\"`）；契约测试覆盖精确参数转发 |
+| 主 Session 工具列表 | 从**实时工具注册表**过滤（`tools.restrict()` 只接受实际存在的工具），不再按平台猜 `bash`/`pwsh`；Windows profile 同时加载 bash 插件时两个 shell 都保留 |
+| 准备命令容器 | Windows 为 `cmd.exe /d /s /c <command>`；POSIX 仍 `sh -c`。**这是 E2E 才暴露的缺陷**：旧构建走 `sh -c`，Windows 上没有 sh 且反斜杠被吃掉，报 `sh: line 1: C:UsersChen…: command not found`；见 WINDOWS-DELTA §3.4 |
+| **端到端首单（实跑，真实 PR）** | 发起人 `WEAaaa-sudo` 在 `Check-Mj/superagent-playground` issue #1 评论 `@Check-mj …` → 智能体 `Check-mj` 收到 `mention` 通知 → Trigger（`human: true`, `addressed: mention`）→ 决策 **`accept / explicit / explicitRouted`** → Ticket → 自动回一条带 `<!-- dsh-superagent:<id> -->` 标记的确认评论 → 执行器占槽 → prepare 建 worktree → worker Session 编辑 `README.md`、提交、推送 `agent/readme-getting-started-fa569c55e2bc` → **PR #5**（OPEN、MERGEABLE、+6/−0、1 个文件）→ 原对话交付评论带 PR 链接，并说明自动合并关闭、需人工合并。<https://github.com/Check-mj/superagent-playground/pull/5> |
 | 端口/`--patch` 规则 | `--port` 输给 profile 的 `webserver.port`；`--patch` 是启动器参数，必须排在应用参数之前；`--no-open --patch` 报 `unknown option` |
 | stateDir 单实例 | 同一 `stateDir` 第二个后端 `Lock file is already being held` |
 | 面板后端行为 | `dsh web: http://127.0.0.1:<port>/?token=…` 打印；裸 URL 401；`GET /orchestrator/api/state` 200，待配置状态为 `setup.problem.code = repositoryUnset` + `health.runtime = paused/setupPending` |
@@ -1159,7 +1178,6 @@ Otherwise (exit 1) run `<checkout>\scripts\dsh-superagent.cmd --profile superage
 | --- | --- |
 | 正常桌面用户双击的真实路径 | 应用验收是在**自动化/受限令牌**下做的（Electron 拿到 Low-integrity 令牌写不了 `%USERPROFILE%\.dsh`，所以当时用了 `DSH_HOME=<临时目录>\dsh-home` + `SUPERAGENT_STATE_DIR=<临时目录>\app-test-state`）。**正常用户从自己桌面双击（Medium IL）**预期不受此限制，但这一步没人跑过；首次使用请以"能否打开面板且 Overview 不报 EPERM"为准 |
 | 安装后整体搬家 | 设计上支持（重跑 `install.cmd -Force` 重写 `paths.json`/快捷方式），但没有实跑过 |
-| 端到端首单 | "智能体账户登录 + 面板填仓库/CLI → 允许列表 @ 一下 → 1 分钟内出 Ticket → PR"整链尚未完整实测 |
 | winget id 与 `--scope user` | 当前无网络/不能提权，未验证；以官方安装器的"当前用户"选项为准 |
 | 面板设置页交互 | 面板**渲染**已验证（截图）；Sources/Policy/Execution/Prompts 的逐项点击与保存流程未在应用窗口里逐项走过（字段与语义依据源码/上游文档） |
 | 应用构建的可重复性 | 本机产物已验收；在一台**干净机器**上从零 `npm install electron` + `build-portable.js` 未验证（Electron 下载可能需要镜像，见 3.6） |
@@ -1300,12 +1318,13 @@ Remove-Item -Recurse -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\
 
 ### 13.5 参考
 
-- 本 fork 的**权威差量清单与升级流程**：`<checkout>\WINDOWS-DELTA.md`
+- 本 fork 的**权威差量清单与升级流程**：`<checkout>\WINDOWS-DELTA.md`（含 §3.4 E2E 暴露的两处缺陷、§3.5 batch 包装器参数传递）
 - **应用布局与路径解析顺序**：`<checkout>\windows-app\INSTALL.md`；应用本身：`<checkout>\windows-app\README.md`
-- 上游：`README.md`、`SETUP.md`、`docs/000`–`docs/008`（本 checkout 内）
+- 本 fork 的远程仓库（可引用）：`origin` = `Check-mj/dsh-superagent-windows`；`main` 当前 `a3156c7`；`upstream` = <https://github.com/deepseek-ai/dsh-superagent-prototype>
+- 契约测试：`tests/windows-port.spec.ts`（batch shim + PATH 剥离 + `.cmd` 包装器精确传参，2 条）
+- 文档基线：`README.md`、`SETUP.md`、`docs/000`–`docs/008`（本 checkout 内）
 - 部署与排障原文：`docs/006-deployment.md`
-- 每条配置的**预期行为**以源码为准：`src/deployment.ts`、`src/infra/environment.ts`、`src/executor/dsh.ts`、`src/app/setup.ts`
-- 上游仓库：<https://github.com/deepseek-ai/dsh-superagent-prototype>
+- 每条配置的**预期行为**以源码为准：`src/deployment.ts`、`src/infra/environment.ts`、`src/executor/dsh.ts`、`src/app/sessions.ts`、`src/app/setup.ts`
 
 ---
 
