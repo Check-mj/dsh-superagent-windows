@@ -50,6 +50,22 @@
 - 单测：调用返回 Started 而非结果；完成后父 Session 收到一条消息；cancel 后不再投递。
 - 真跑：worker Session 里发起一个慢子任务，期间仍能响应新消息（这是文章 §4.1 的核心断言）。
 
+### 2.1 修复：分片会话改为按需创建
+
+**缺陷（由一次真实使用暴露）**：分片会话原先是启动时**预置**的。这样一个闲置分片会出现在 DSH 界面的会话列表里，
+用户打开它时 DSH 会把 preset 选成 `standard`；而 DSH 在会话首轮之后拒绝再改 preset，于是这个会话带着
+standard 的全套工具（含 `edit`、`subagent`）留在那里，既没有我们的工具限制，也没有我们的提示段。
+会话日志里的 preset 序列可以证明：`standard → dsh-superagent-router（我们的重选）→ standard（+79 秒，被 UI 切走）`。
+
+**修复**：不再预置。分片 Router 会话改为**首次投递时创建**（`ensureRouterSession`），健康项如实报告
+`<live> of <configured> Router Sessions (…; a shard starts on its first delivery)`。
+
+**实测**：`routerShards: 2` 重启后健康显示 `1 of 2 Router Sessions (sharded by Thread; a shard starts on its first delivery)`，
+且会话目录里**没有**新增分片会话（重启前后都是 1 个，即历史上遗留的那个）。
+
+**遗留**：那次测试留下的 `orchestrator-…-shard-1` 会话仍存在于 `~/.dsh/sessions`，里面含有用户的测试对话，
+未经同意不删除。
+
 ### P2 · Router 分片（§2.1 未实现的扩容路径）— 放置与预置已完成，分发待接线
 
 **做法**：`routerShards: N` 配置。按 `threadKey` 哈希把 Trigger 分给 N 个 Router Session；全局记忆仍在 Router 层（文章说分片会削弱连续性，所以用 Thread 亲和性把同一 Thread 固定到一个分片，避免跨分片上下文断裂）。

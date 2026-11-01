@@ -86,6 +86,8 @@ export class Runtime extends Service implements SourceHost {
   private stopping?: Promise<void>
   /** Every Router Session this process runs, in shard order; shard 0 is `masterId`. */
   private routerIdsValue: string[] = []
+  /** Shard Router Sessions created so far; the master is always present. */
+  private readonly routerSessions = new Set<string>()
   /** The `router` health entry, claimed once so a restart does not claim it twice. */
   private routerHealth?: ReturnType<HealthBoard['claim']>
   /** The Watchdog Session, which the external control loop prompts on a schedule. */
@@ -150,7 +152,11 @@ export class Runtime extends Service implements SourceHost {
         repliedTo: trigger => repliedTo({ store, sources }, trigger) })
       this.assessor = new MasterAssessor({ get engine() { return runtime.engine }, commands, get deployment() { return setup.deployment }, effects,
         settings: () => store.settings(), paused: () => this.paused(), threadContext: trigger => sources.threadContext(trigger),
-        deliver: (id, text, thread) => sessions.prompt(this.routerFor(thread), id, text, 'steer'),
+        deliver: async (id, text, thread) => {
+          const target = this.routerFor(thread)
+          await this.ensureRouterSession(target)
+          await sessions.prompt(target, id, text, 'steer')
+        },
         candidateCard: candidate => candidateCard(links, candidate) })
       const outbox = this.outbox = new Outbox({ store, effects, sources, commands, paused: () => this.paused() })
       const { assessor, executor } = this
@@ -236,10 +242,6 @@ export class Runtime extends Service implements SourceHost {
     this.sessions.install()
     this.executor.install()
     await this.sessions.ensure(this.masterId, this.machine.stateDir, 'dsh-superagent orchestrator', 'orchestrator')
-    for (const [index, id] of this.routerIdsValue.entries()) {
-      if (index === 0) continue
-      await this.sessions.ensure(id, this.machine.stateDir, `dsh-superagent orchestrator shard ${index}`, 'orchestrator')
-    }
     this.reportRouterHealth()
     for (const id of this.settings.syncable()) await this.settings.sync(id).catch(() => { /* sync() records its failure in health. */ })
     // If stop() was called while awaiting setup, session creation, or policy sync, do not start background loops.
@@ -274,6 +276,18 @@ export class Runtime extends Service implements SourceHost {
       this.setup.restart()
     }
   }
+  /**
+   * Creates one Router shard Session the first time a delivery needs it. Eager provisioning was removed: an idle shard
+   * Session appears in the UI, DSH's own preset selection can take it over, and DSH refuses a preset change after the
+   * Session's first turn — leaving a Session that is not ours to manage.
+   */
+  private async ensureRouterSession(id: string): Promise<void> {
+    if (id === this.masterId || this.routerSessions.has(id)) return
+    const index = this.routerIdsValue.indexOf(id)
+    await this.sessions.ensure(id, this.machine.stateDir, `dsh-superagent orchestrator shard ${index}`, 'orchestrator')
+    this.routerSessions.add(id)
+    this.reportRouterHealth()
+  }
   /** The Router Session that owns a Thread: the master while sharding is off, else the shard the Thread hashes to. */
   private routerFor(thread?: string): string {
     return triggerSessionId(thread ? { thread } : {}, this.masterId, this.routerIdsValue.length)
@@ -283,7 +297,9 @@ export class Runtime extends Service implements SourceHost {
     const count = this.routerIdsValue.length
     try {
       this.routerHealth ??= this.board.claim('router', { state: 'ready', detail: '' })
-      this.routerHealth.set({ state: 'ready', detail: count === 1 ? 'one Router Session' : `${count} Router Sessions (sharded by Thread)` })
+      const live = count === 1 ? 1 : this.routerSessions.size + 1
+      this.routerHealth.set({ state: 'ready', detail: count === 1 ? 'one Router Session'
+        : `${live} of ${count} Router Sessions (sharded by Thread; a shard starts on its first delivery)` })
     } catch (error) { this.ctx.logger.warn('dsh-superagent could not report Router health: %s', String(error)) }
   }
   /**
