@@ -7,6 +7,7 @@ import type { SourceContext } from '../sources/host.ts'
 import type { SourceRegistry } from '../sources/registry.ts'
 import type { Outbox } from './outbox.ts'
 import type { Store } from './store.ts'
+import { stateStoreOf } from './state-store.ts'
 
 export interface SourceContextDeps {
   readonly store: Pick<Store, 'atomic' | 'get' | 'set' | 'delete' | 'keys' | 'threads' | 'tickets' | 'triggers' | 'read'>
@@ -59,13 +60,10 @@ export function sourceContextOf(deps: SourceContextDeps, kind: { kind: string; h
     },
     receive: trigger => deps.receive(trigger),
     atomic: work => store.atomic(work),
-    state: {
-      // A Source's own state follows its instance: cursors, retry tables and stream positions must not be shared, or one
-      // instance would read another's items through the wrong repository scope. The default instance keeps the bare keys.
-      get: name => store.get(statePrefix + name),
-      set: (name, value) => { const key = statePrefix + name; if (value === undefined) store.delete(key); else store.set(key, value) },
-      keys: prefix => store.keys(statePrefix + prefix).map(key => key.slice(statePrefix.length)),
-    },
+    // A Source's own state follows its instance (docs/017 P4 seam): cursors, retry tables and stream positions must not
+    // be shared, or one instance would read another's items through the wrong repository scope.
+    // The seam is structurally the same accessor; the cast only bridges its generic `get<V>` signature.
+    state: stateStoreOf(store, statePrefix) as unknown as SourceContext['state'],
     threads: {
       get: key => store.threads.get(key),
       subscribed: source => store.read.subscribedThreads(source),

@@ -294,6 +294,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/app/config-file.ts` | Reads the JSON settings file the machine configuration names and overlays its blocks on the stored settings at startup, so Sources, Policy, Execution and Prompts can live in version control; a malformed file is logged and ignored |
 | `src/app/watchdog.ts` | The external control loop of the official design (§6): builds the scheduled digest of Tickets, load and unhealthy parts, and drives a separate Session that observes and intervenes but never takes work |
 | `src/app/subagents.ts` | Background subagent lifecycle (article §4.1): a Started acknowledgement, work in its own Session, one event message back to the parent, cancellation, and spilled long results |
+| `src/app/state-store.ts` | The durable key/value seam (docs/017 P4, article §5): the interface a future remote store would implement, and an adapter that delegates to the local store with an optional namespace prefix |
 | `src/deployment.ts` | The plugin `Config` and `Machine`; `resolveDeployment` and `resolveFeishuBot` read the repository and the accounts from the Source settings, each CLI run as Executor shells run it; `SETUP_FIELDS` lists the Source fields setup reads. The code names no person, account or organization |
 | `src/setup.ts` | Setup problems: `SetupError`, with a code, the place that fixes it and the English text the log, the main Session and the panel share |
 | `src/policy.ts` | The Policy: the settings schemas by block, the Policy version, the gate and Mandate revalidation |
@@ -427,6 +428,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/watchdog.spec.ts` | The Watchdog digest: the state it states, the judgement it asks for, the management-API header, silence when healthy, and the pieces it derives from Health and a Ticket |
 | `tests/chain-of-recall.spec.ts` | Chain of recall: every card inlines the next hop's id and read path (Trigger → Thread → Ticket → Worker Session, Decision both ways), and the id a card names is the last segment of the path it gives |
 | `tests/subagents.spec.ts` | Background subagents: Started returns at once, the result reaches the parent once as an event message, cancel stops delivery, long results spill, finished records are pruned |
+| `tests/state-store.spec.ts` | The state-store seam: delegation, namespace scoping and prefix filtering |
 | `tests/queue.spec.ts` | The Runtime's work through the effect queue, and what earlier versions stored |
 | `tests/followups.spec.ts` | A person's follow-up on a Ticket's Thread: its notice to the main Session, the tools that act on it, what a burst costs; a worker's hand-back and context follow, and the main Session's note |
 | `tests/health.spec.ts` | One health entry per part, each cleared by its own next success |
