@@ -8,3 +8,6 @@ coverage/
 windows-app/Superagent/
 windows-app/verification/
 windows-app/node_modules/
+
+# vitest JSON reporter output
+results.json
