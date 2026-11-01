@@ -93,3 +93,20 @@ Router 待遇（`SocketHost.routerIds()`、`decorate` 对每个 Router 生效、
 | P4 状态存储接缝 | ✅ 接口 + 本地适配器 + 真实调用点 | `tests/state-store.spec.ts`（3 例） | 行为零变化（同一批键、同一前缀语义） | — |
 
 两项待人工验收的原因相同：都需要**本机之外的动作**（另一账号发事件；人在窗口里对话）。这两条不是实现缺口，是验证缺口，已分别写成可复制步骤。
+
+## 7. 重要更正：上游可能已经支持后台子代理
+
+用户的实测截图显示：一条「用 subagent_background 跑 25 秒慢任务」的对话里，**父会话 14 秒就回复了**，
+25 秒后收到完成通知，结果 5050 正确。
+
+但会话日志解压核对后，**实际被调用的是 DSH 自带的 `subagent` 工具**（`subagent` 出现 5 次，
+我们的 `subagent_background` 出现 0 次），子代理是一个 UUID 命名的 DSH 子会话（内含 `pwsh` / `send_message`）。
+worker preset 里确实同时装了 `@deepseek-ai/dsh-tool-subagent` 与 `@deepseek-ai/dsh-tool-subagent-control`。
+
+**结论**：`docs/013`/`docs/017` 之前写的「上游 `dsh-tool-subagent` 没有暴露后台模式」**是错的**——当时的判断
+依据只是 grep 包里有没有 `background` 字样，没有验证真实行为。
+
+**处置（待确认后执行）**：按 `docs/017` §4 的规则「上游实现了同名能力就切回上游」，我们的
+`src/app/subagents.ts` 与两个工具应当**退役删除**。唯一需要先确认的是：截图那次对话跑在哪个 Session
+（标题显示 `dsh-superagent orchestrator shard…`，但 router preset 的插件列表里没有 `tool-subagent`）。
+如果是 worker Session，则上游覆盖 worker；如果 router Session 也能用，那我们的模块就完全冗余。
