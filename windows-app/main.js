@@ -577,6 +577,7 @@ function splashHtml(message, note) {
   <div class="bar"><i></i></div>
   <div class="hint">${escapeHtml(message || '正在启动 DSH-Superagent…')}</div>
   <div class="hint" style="margin-top:6px">正在启动后端服务，首次启动可能需要十几秒。</div>
+  <div class="hint" style="margin-top:6px">第一次使用？面板打开后第一个标签是「介绍」，四步上手都在里面。</div>
   ${noteHtml}
 </div></body></html>`;
 }
@@ -1012,7 +1013,13 @@ function buildMenu() {
               title: '关于 DSH-Superagent',
               message: `DSH-Superagent ${app.getVersion()}`,
               detail: [
-                'DeepSeek Harness · superagent 桌面外壳',
+                'DeepSeek Harness · superagent 的 Windows 深度适配版（非官方产品）',
+                '',
+                '上游：deepseek-ai/dsh-superagent-prototype',
+                '      MIT · Copyright (c) 2026 DeepSeek Harness Team',
+                '本构建：github.com/Check-mj/dsh-superagent-windows',
+                '差异清单：WINDOWS-DELTA.md（上游实现同样机制时会切回上游）',
+                '',
                 `Electron ${process.versions.electron} / Chromium ${process.versions.chrome}`,
                 `用户数据目录: ${USER_DATA}`,
               ].join('\n'),
