@@ -223,3 +223,64 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 | 状态存储接缝（§5） | `src/app/state-store.ts`、`src/app/source-context.ts` | `StateStore` 接口 + 本地适配器（可选命名空间前缀），Source 状态经它构造 | 上游若支持远端状态后端，删掉适配器、改为注入上游实现 |
 
 | 异步子任务（§4.1 右半边） | （无代码） | 曾实现 `subagent_background`/`subagent_cancel`，实测上游 `subagent` 已支持后台运行后**已删除** | 无需切回：本项由上游提供，详见 docs/017 §7 |
+
+---
+
+## 10. DSH 0.2.2-rc.1 适配（2026-11-06）
+
+上游把框架版本推到 `0.2.2-rc.1`，本节记录随之做的改动。**全部属于 L1/L4 层**：没有新增文件，没有触碰 §3 的 Windows 补丁。
+
+### 10.1 依赖下限
+
+| 项 | 旧 | 新 | 为什么 |
+|---|---|---|---|
+| `@deepseek-ai/dsh-*`（25 个 peer） | `^0.2.1-alpha.2` | `>=0.2.2-rc.1 <0.2.3-0` | `dsh-agent` 的 peer 是**精确锁**（`0.2.2-rc.1`），整组必须同步；写范围是为了让后续 `0.2.2` 正式版能装上 |
+| `@deepseek-ai/cordis` | `4.0.5-alpha.1` | `~4.1.0` | 新包 peer 要求 |
+| `@deepseek-ai/schemastery` | `3.18.5-alpha.1` | `~3.19.0` | 同上 |
+| 新增 peer | — | `dsh-brand`、`dsh-typert-protocol`、`dsh-util-values`、`dsh-session-projection` | 新版本引入，不声明就是 unmet peer |
+
+devDependencies 全部钉死 `0.2.2-rc.1`，保持「装什么就是什么」。
+
+### 10.2 API 迁移
+
+| 位置 | 0.2.1 | 0.2.2 | 我们的处理 |
+|---|---|---|---|
+| Session 历史 | `sessionController.inspect(id)` → `{ events }` | `page({ address })` → `{ records: [{ type: 'event', event: SessionWireEvent }] }` | `transcript()` 改读 `page()`；`transcriptEntry()` 入参放宽到 wire 形状，一个映射同时服务两处 |
+| 表单快照 | `ConfigFormSnapshot.mode`（`host`/`memory`） | 字段删除，语义并入 `writable` | 面板只读判定改看 `writable === false`；「远程浏览器」与「本地只读」不再区分成因 |
+| 模型选择 | `installModelSelection(ctx, host)` | `installModelSelection(agentCtx)`，从 Session 投影读 | 测试用 `AgentModel(readState, session, options)` 显式搭这条链；优先级 `pending ?? lastUsed ?? options` |
+| Web 服务器 | `webServer.port: number` | `number \| undefined` | 同源检查处补 `?? 0` |
+
+### 10.3 subprocess 不再经 shell
+
+新版的 `dsh-subprocess` 直接 `spawn(program, args)`，不再交给 shell 解析。
+
+- **生产路径不受影响**：`runAsWorker()` 本来就传 `cmd.exe` 或真实可执行文件（`gh.exe`、python），`runCli()` 自己 spawn 也不经 dsh。
+- **测试路径受影响**：`env`/`echo`/`sleep` 在 Windows 上没有可执行文件，`cmd` 缺 `.exe` 就解析不到。
+
+处理方式与 §6 既有做法一致——**修 fixture，不改生产代码**：
+
+| 测试 | 旧 | 新 |
+|---|---|---|
+| 退出码 | `cmd` / `sh` 分支 + `it.skipIf(WINDOWS)` | `cmd.exe`，**解除 skip**，Windows 上真跑 |
+| 环境变量 | 外部 `env` | `node -e` 打印 process.env |
+| 后台作业 | `sleep 5` | `node -e 'setTimeout(()=>{},5000)'` |
+| 标准输出 | `echo still` | `node -e "console.log('still')"` |
+| 信号 | `kill -9 $$` | 保留 `if (process.platform !== 'win32')` 守卫（MSYS 返回 137 而非信号） |
+
+`ticket directory check` 那组仍整体 `describe.skipIf(WINDOWS)`：它依赖 `#!/bin/sh` 垫片与 `chmod 0o755`，换 node 要重写语义，留作独立议题。
+
+### 10.4 验证
+
+```
+pnpm typecheck   0 错误
+pnpm test        68 files passed | 2 skipped · 1185 passed | 47 skipped
+pnpm build       11 files · 722.60 kB · done
+运行             runtime/relay/notice/launch/delivery/assessment/reply/evals/models/bili_kb/bilibili/github 全 ready
+```
+
+### 10.5 升级检查清单（沿用 §5，补四条 2.2 之后的新经验）
+
+1. `pnpm install` 后先看 **unmet peer**——`dsh-agent` 精确锁，缺一个都装不上。
+2. `pnpm typecheck` 会直接指出 API 删除（`inspect`、`mode`、`ModelSelectionRef` 都是这样暴露的）。
+3. `pnpm test` 失败里凡 `ENOENT`/`EINVAL`，先怀疑「测试用了 shell 内建或 POSIX 工具」，而不是生产代码。
+4. 起来后看 health 各项；某项长期停在 `starting` 时，先等够一个轮询周期再判，不要立刻当成故障。

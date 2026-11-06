@@ -26,8 +26,17 @@ export const handoffPolicy = (role: 'orchestrator' | 'worker'): string => `${han
 export const autoMergeThreshold = (lines: number): string => `it changes fewer than ${lines} lines (additions plus deletions);`
 
 /** Retains message content while omitting streamed chunks, usage accounting, and reasoning blocks. */
-export function transcriptEntry(event: SessionEvent) {
+/**
+ * Shape both the raw Session event and the browser wire event satisfy.
+ *
+ * Session history is now read through `sessionController.page()`, which returns wire events
+ * (`{ type: string; data: JsonValue }`). The raw form is a narrower union with typed data, so the
+ * two are structurally compatible apart from that width — widening here keeps one mapper serving both.
+ */
+type TranscriptEvent = { type: string; data: any }
+
+export function transcriptEntry(event: TranscriptEvent) {
   if (event.type !== 'user/message' && event.type !== 'tool/result' && event.type !== 'assistant/message') return undefined
   const message = event.type === 'user/message' ? event.data : event.data.message
-  return { type: event.type, message: { role: message.role, content: message.content.filter(block => block.type !== 'reasoning') } }
+  return { type: event.type, message: { role: message.role, content: message.content.filter((block: { type: string }) => block.type !== 'reasoning') } }
 }

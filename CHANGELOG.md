@@ -7,6 +7,29 @@ Upstream behaviour is tracked in [`WINDOWS-DELTA.md`](WINDOWS-DELTA.md); this fi
 The npm package id stays `dsh-superagent` (plugin id, profile dependency and internal paths); only the displayed
 product name changed to DSH-Superagent.
 
+## [0.2.0] — 2026-11-06
+
+Adapts the fork to **DSH 0.2.2-rc.1**. Verified on Windows: `tsc --noEmit` clean, 68 test files / 1185 tests pass, `tsdown` build succeeds, and a running instance reports every health entry `ready`.
+
+### Changed — dependency floor
+- All 25 `@deepseek-ai/dsh-*` peer ranges move to `>=0.2.2-rc.1 <0.2.3-0`; devDependencies pin `0.2.2-rc.1` exactly. `dsh-agent` locks its siblings by exact version, so the whole set must move together.
+- `@deepseek-ai/cordis` 4.0.5-alpha.1 → ~4.1.0; `@deepseek-ai/schemastery` 3.18.5-alpha.1 → ~3.19.0.
+- Four peers the new release requires are now declared: `dsh-brand`, `dsh-typert-protocol`, `dsh-util-values`, `dsh-session-projection`.
+
+### Changed — API moves in 0.2.2
+- `SessionController.inspect()` is gone. Session history is read through `page({ address: { kind: 'session', sessionId } })`, which returns records shaped `{ type: 'event', event: SessionWireEvent }` rather than raw events. `transcriptEntry()` now accepts the wider wire shape so one mapper serves both call sites.
+- `ConfigFormSnapshot.mode` is gone; `writable` carries the same meaning. The panel's read-only hint keys off `writable === false` rather than `mode === 'memory'`. The two former causes (remote browser, local read-only) are no longer distinguished.
+- `ModelSelectionRef` is gone and `installModelSelection(agentCtx)` takes one argument, reading the selection from the Session projection. The role-model test builds that chain explicitly with `AgentModel`, whose precedence is `pending ?? lastUsed ?? options`.
+- `webServer.port` is now `number | undefined`.
+
+### Changed — tests that assumed a POSIX shell
+
+0.2.2 spawns the program directly instead of handing it to a shell, so a bare `cmd` no longer resolves and POSIX tools have no executable:
+
+- `cmd` → `cmd.exe` in the exit-status test; its `it.skipIf(WINDOWS)` is lifted and the test now runs on Windows.
+- `env` / `echo` / `sleep` fixtures → `node -e` equivalents, which exist on both platforms.
+- `kill -9 $$` keeps a POSIX-only guard: MSYS `sh` reports exit code 137 instead of a signal.
+- The fake `sessionController` in `tests/fixtures/host.ts` exposes `page` instead of `inspect`.
 ## [0.1.0] — 2026-11-01
 
 First publishable Windows adaptation.
