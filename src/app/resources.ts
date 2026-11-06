@@ -112,7 +112,12 @@ const THREAD_DECISIONS = 5
 const triggerLine = (trigger: Trigger) => ({ trigger_id: trigger.id, actor: trigger.actor.id, human: trigger.human, at: trigger.at,
   preview: preview(trigger.text), chars: trigger.text.length, read: `trigger/${trigger.id}` })
 async function transcript(host: ResourceHost, ticketId: string) {
-  return (await host.context.sessionController.inspect(workerSessionId(ticketId) as SessionId)).events
+  // 2.2 起 `inspect()` 没了，历史改从 `page()` 读，返回的是浏览器线格式（records[].event）。
+  // 分批读最近一页就够：这个资源是给面板「看这段对话」用的，不是全量导出。
+  const page = await host.context.sessionController.page(
+    { address: { kind: 'session', sessionId: workerSessionId(ticketId) as SessionId }, maxMessages: 200 },
+    AbortSignal.timeout(15_000))
+  return page.records.map((record: { event: { type: string; data: any } }) => record.event)
 }
 
 const ROUTES: readonly Route[] = [
@@ -283,7 +288,7 @@ const ROUTES: readonly Route[] = [
     else if (section === 'transcript') {
       body = (await transcript(host, id)).flatMap((event, index) => {
         const entry = transcriptEntry(event)
-        const said = entry?.message.content.map(block => block.type === 'text' ? block.text : `[${block.type}]`).join(' ') ?? ''
+        const said = entry?.message.content.map((block: { type: string; text?: string }) => block.type === 'text' ? block.text : `[${block.type}]`).join(' ') ?? ''
         return entry ? [{ type: entry.type, preview: preview(said).slice(0, 80), chars: JSON.stringify(entry).length,
           read: `ticket/${id}/message/${index}` }] : []
       }).reverse().map(event => JSON.stringify(event)).join('\n')

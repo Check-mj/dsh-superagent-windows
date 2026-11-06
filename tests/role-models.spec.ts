@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import { agentEvents, installModelSelection, type Agent, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import { AgentModel, agentEvents, type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { initializeRoleModel } from '../src/app/role-models.ts'
@@ -15,11 +15,21 @@ async function fixture() {
   ctx.reflect.provide('sessionPersistence', { flush })
   const session = Session.create(SessionId('role-model'))
   const agent = { ctx, session } as Agent
-  const host: ModelSelectionRef = { get current() { return session.requestHeader()?.config ?? { provider: 'host', model: 'default', reasoningEffort: ReasoningEffortId('high') } }, assembled: undefined }
-  installModelSelection(ctx, host)
-  const request = () => agentEvents(ctx, agent).waterfall('agent/request', { turn: 1, step: 1, signal: new AbortController().signal }, async () => ({ provider: 'seed', model: 'seed' }))
+  // 2.2 把「这一票用哪个模型」从可注入的 host 对象改成了 AgentModel：它从 Session 投影
+  // （lastUsed / pending）读，读不到才回落 AgentOptions。这里如实照搬这条链路 —— 删掉它
+  // 就等于删掉「持久化之后仍用同一模型」这个被测行为本身。
+  const host = { provider: 'host', model: 'default', reasoningEffort: ReasoningEffortId('high') }
+  // AgentModel 的取值优先级是 pending ?? lastUsed（见 dsh-agent 的 recordedSelection）。
+  // pending 指「已记录但还没被某个请求用掉」的选择，也就是最后一条 model/selection 事件。
+  const latest = (type: string) => {
+    const events = session.snapshotEvents().filter(event => event.type === type)
+    return events.length ? (events[events.length - 1] as { data: ModelSelection }).data : null
+  }
+  const model = new AgentModel(() => ({ lastUsed: session.requestHeader()?.config ?? null, pending: latest('model/selection') }),
+    session, host as never)
+  const request = () => agentEvents(ctx, agent).waterfall('agent/request', { turn: 1, step: 1, signal: new AbortController().signal }, async () => model.current() ?? { provider: 'seed', model: 'seed' })
   const record = (selection: ModelSelection) => { const event = session.append('request/header', { header: { config: selection }, reason: 'initial' }); ctx.emit('session/event', session, event) }
-  return { ctx, agent, host, resolve, flush, request, record }
+  return { ctx, agent, host, model, resolve, flush, request, record }
 }
 it('keeps prompt variables and initial routing on the role model without saving the host default', async () => {
   const { ctx, agent, request, record, flush } = await fixture()
@@ -36,12 +46,14 @@ it('keeps prompt variables and initial routing on the role model without saving 
   expect(await request()).toEqual(selected)
 })
 it('lets a later explicit selection win without changing the in-flight assembled step', async () => {
-  const { ctx, agent, host, request } = await fixture()
+  const { ctx, agent, model, request } = await fixture()
   await initializeRoleModel(ctx, agent, { provider: 'worker', model: 'one' })
   await ctx.systemPrompt.assemble()
   const manual = { provider: 'manual', model: 'two', reasoningEffort: ReasoningEffortId('low') }
-  Object.defineProperty(host, 'current', { value: manual, configurable: true })
-  const event = agent.session.append('model/selection', manual); ctx.emit('session/event', agent.session, event)
+  // 2.2 的选择入口是 AgentModel.select()，它自己 append 那条 model/selection。
+  model.select(manual)
+  const event = agent.session.snapshotEvents().at(-1)!
+  ctx.emit('session/event', agent.session, event)
   expect(await request()).toEqual({ provider: 'worker', model: 'one' })
   await ctx.systemPrompt.assemble()
   expect(await request()).toEqual(manual)
