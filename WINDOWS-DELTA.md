@@ -254,7 +254,7 @@ devDependencies 全部钉死 `0.2.2-rc.1`，保持「装什么就是什么」。
 
 新版的 `dsh-subprocess` 直接 `spawn(program, args)`，不再交给 shell 解析。
 
-- **生产路径不受影响**：`runAsWorker()` 本来就传 `cmd.exe` 或真实可执行文件（`gh.exe`、python），`runCli()` 自己 spawn 也不经 dsh。
+- **生产路径不受影响**：`runAsWorker()` 本来就传 `cmd.exe` 或真实可执行文件（`gh.exe`、python）；自己用 `child_process` spawn 的路径也从不经过 dsh。
 - **测试路径受影响**：`env`/`echo`/`sleep` 在 Windows 上没有可执行文件，`cmd` 缺 `.exe` 就解析不到。
 
 处理方式与 §6 既有做法一致——**修 fixture，不改生产代码**：
@@ -275,7 +275,6 @@ devDependencies 全部钉死 `0.2.2-rc.1`，保持「装什么就是什么」。
 pnpm typecheck   0 错误
 pnpm test        68 files passed | 2 skipped · 1185 passed | 47 skipped
 pnpm build       11 files · 722.60 kB · done
-运行             runtime/relay/notice/launch/delivery/assessment/reply/evals/models/bili_kb/bilibili/github 全 ready
 ```
 
 ### 10.5 升级检查清单（沿用 §5，补四条 2.2 之后的新经验）
