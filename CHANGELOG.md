@@ -9,7 +9,7 @@ product name changed to DSH-Superagent.
 
 ## [0.2.0] — 2026-11-06
 
-Adapts the fork to **DSH 0.2.2-rc.1**. Verified on Windows: `tsc --noEmit` clean, 68 test files / 1185 tests pass, `tsdown` build succeeds, and a running instance reports every health entry `ready`.
+Adapts the fork to **DSH 0.2.2-rc.1**. Verified on Windows: `tsc --noEmit` clean, 68 test files / 1185 tests pass, `tsdown` build succeeds.
 
 ### Changed — dependency floor
 - All 25 `@deepseek-ai/dsh-*` peer ranges move to `>=0.2.2-rc.1 <0.2.3-0`; devDependencies pin `0.2.2-rc.1` exactly. `dsh-agent` locks its siblings by exact version, so the whole set must move together.
