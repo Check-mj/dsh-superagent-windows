@@ -1008,9 +1008,17 @@ function stopBackend() {
       resolve();
     };
     child.once('exit', finish);
+    // Kill the whole tree while the launcher is still alive. taskkill /T walks
+    // descendants, so the DSH runtime worker (a grandchild that holds the state
+    // lock) dies with it. A bare child.kill() only ends the launcher: Windows
+    // re-parents the worker, which then survives as an orphan and keeps
+    // refreshing the lock every ~15s, so proper-lockfile's stale:30s never
+    // trips and every later backend fails with "Lock file is already being
+    // held" while github-watch waits for the orchestrator forever.
+    killTree(pid);
     try { child.kill(); } catch (err) { log('[backend] kill failed: ' + err.message); }
 
-    // Escalate: kill the whole tree if the child is still alive.
+    // Escalate: repeat the tree kill if the child is still alive.
     const hardTimer = setTimeout(() => {
       log('[backend] grace expired, killing tree');
       killTree(pid);
